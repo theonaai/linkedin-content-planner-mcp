@@ -51,14 +51,27 @@ export function AttachmentsPanel({ postId }: { postId: string }) {
   return (
     <div>
       <div className="mb-3 flex items-center gap-3">
-        <input ref={fileInputRef} type="file" onChange={handleFileChange} disabled={uploading} className="text-xs" />
-        {uploading && <span className="text-xs text-gray-400">Uploading…</span>}
+        <input
+          ref={fileInputRef}
+          type="file"
+          onChange={handleFileChange}
+          disabled={uploading}
+          className="hidden"
+        />
+        <button
+          onClick={() => fileInputRef.current?.click()}
+          disabled={uploading}
+          className="flex items-center gap-1.5 rounded-md border border-gray-300 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-40"
+        >
+          📎 {uploading ? "Uploading…" : "Attach file"}
+        </button>
+        <span className="text-xs text-gray-400">Carousels, images, PDFs — up to 25 MB</span>
       </div>
       {error && <p className="mb-2 text-xs text-red-600">{error}</p>}
       {loading ? (
         <p className="text-xs text-gray-400">Loading…</p>
       ) : attachments.length === 0 ? (
-        <p className="text-xs text-gray-400">No attachments yet — carousels, images, PDFs.</p>
+        <p className="text-xs text-gray-400">No attachments yet. Click “Attach file” to add one.</p>
       ) : (
         <div className="flex flex-col gap-2">
           {attachments.map((a) => (

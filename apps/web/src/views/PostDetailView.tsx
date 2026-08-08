@@ -1,13 +1,16 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { api } from "../lib/api.js";
 import { NEXT_STATES, STATE_LABELS } from "../lib/stateMachine.js";
+import { formatDateDisplay } from "../lib/dates.js";
+import { useAutosizeTextarea } from "../lib/useAutosizeTextarea.js";
 import { StateBadge } from "../components/StateBadge.js";
 import { LinkedInPreview } from "../components/LinkedInPreview.js";
 import { VersionsPanel } from "../components/VersionsPanel.js";
 import { CommentsPanel } from "../components/CommentsPanel.js";
 import { ReviewsPanel } from "../components/ReviewsPanel.js";
 import { AttachmentsPanel } from "../components/AttachmentsPanel.js";
+import { ScheduleDialog } from "../components/ScheduleDialog.js";
 import type { Post, PostVersion } from "../lib/types.js";
 
 type Tab = "versions" | "comments" | "reviews" | "attachments";
@@ -24,12 +27,14 @@ export function PostDetailView() {
   const [post, setPost] = useState<Post | null>(null);
   const [versions, setVersions] = useState<PostVersion[]>([]);
   const [draft, setDraft] = useState("");
-  const [dateInput, setDateInput] = useState("");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [tab, setTab] = useState<Tab>("versions");
   const [selectedVersionId, setSelectedVersionId] = useState<string | null>(null);
+  const [scheduleDialogOpen, setScheduleDialogOpen] = useState(false);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+  useAutosizeTextarea(textareaRef, draft);
 
   const load = useCallback(async () => {
     if (!id) return;
@@ -40,7 +45,6 @@ export function PostDetailView() {
       setPost(loadedPost);
       setVersions(loadedVersions);
       setDraft(loadedVersions[loadedVersions.length - 1]?.contentMarkdown ?? "");
-      setDateInput(loadedPost.scheduledDate ?? "");
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     } finally {
@@ -85,16 +89,16 @@ export function PostDetailView() {
     }
   }
 
-  async function commitDate() {
+  async function handleScheduleSave(date: string) {
     if (!post) return;
-    const next = dateInput || null;
-    if (next === (post.scheduledDate ?? null)) return;
-    try {
-      await api.setPostDate(post.id, next);
-      await load();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : String(err));
-    }
+    await api.setPostDate(post.id, date);
+    await load();
+  }
+
+  async function handleScheduleRemove() {
+    if (!post) return;
+    await api.setPostDate(post.id, null);
+    await load();
   }
 
   if (loading) return <p className="text-sm text-gray-500">Loading…</p>;
@@ -116,19 +120,24 @@ export function PostDetailView() {
             <StateBadge state={post.state} />
             <span className="text-xs text-gray-400">{post.platform}</span>
           </div>
-          <div className="flex items-center gap-2">
-            <label className="text-xs text-gray-500" htmlFor="scheduledDate">
-              Scheduled date
-            </label>
-            <input
-              id="scheduledDate"
-              type="date"
-              className="rounded-md border border-gray-300 px-2 py-1 text-sm"
-              value={dateInput}
-              onChange={(e) => setDateInput(e.target.value)}
-              onBlur={commitDate}
-            />
-          </div>
+          {post.scheduledDate ? (
+            <div className="flex items-center gap-2 rounded-full bg-emerald-50 py-1 pl-3 pr-1 text-sm text-emerald-800">
+              <span>📅 Scheduled for {formatDateDisplay(post.scheduledDate)}</span>
+              <button
+                onClick={() => setScheduleDialogOpen(true)}
+                className="rounded-full px-2 py-0.5 text-xs font-medium text-emerald-700 hover:bg-emerald-100"
+              >
+                Edit
+              </button>
+            </div>
+          ) : (
+            <button
+              onClick={() => setScheduleDialogOpen(true)}
+              className="rounded-md border border-gray-300 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50"
+            >
+              📅 Schedule post
+            </button>
+          )}
         </div>
 
         {error && <p className="mb-3 text-sm text-red-600">{error}</p>}
@@ -150,7 +159,8 @@ export function PostDetailView() {
         <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
           <div>
             <textarea
-              className="h-64 w-full resize-y rounded-md border border-gray-300 p-3 font-mono text-sm"
+              ref={textareaRef}
+              className="min-h-32 w-full resize-none overflow-hidden rounded-md border border-gray-300 p-3 font-mono text-sm"
               value={draft}
               onChange={(e) => setDraft(e.target.value)}
               placeholder="Draft content (markdown subset: **bold**, *italic*, bullets)…"
@@ -207,6 +217,15 @@ export function PostDetailView() {
         {tab === "reviews" && <ReviewsPanel postId={post.id} postState={post.state} onReviewed={load} />}
         {tab === "attachments" && <AttachmentsPanel postId={post.id} />}
       </div>
+
+      {scheduleDialogOpen && (
+        <ScheduleDialog
+          currentDate={post.scheduledDate}
+          onSave={handleScheduleSave}
+          onRemove={handleScheduleRemove}
+          onClose={() => setScheduleDialogOpen(false)}
+        />
+      )}
     </div>
   );
 }
