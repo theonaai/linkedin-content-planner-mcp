@@ -5,13 +5,13 @@ import { NEXT_STATES, STATE_LABELS } from "../lib/stateMachine.js";
 import { formatDateDisplay } from "../lib/dates.js";
 import { useAutosizeTextarea } from "../lib/useAutosizeTextarea.js";
 import { StateBadge } from "../components/StateBadge.js";
-import { LinkedInPreview } from "../components/LinkedInPreview.js";
+import { LinkedInPreview, type CommentAnchor } from "../components/LinkedInPreview.js";
 import { VersionsPanel } from "../components/VersionsPanel.js";
 import { CommentsPanel } from "../components/CommentsPanel.js";
 import { ReviewsPanel } from "../components/ReviewsPanel.js";
 import { AttachmentsPanel } from "../components/AttachmentsPanel.js";
 import { ScheduleDialog } from "../components/ScheduleDialog.js";
-import type { Post, PostVersion } from "../lib/types.js";
+import type { Comment, Post, PostVersion } from "../lib/types.js";
 
 type Tab = "versions" | "comments" | "reviews" | "attachments";
 
@@ -26,6 +26,7 @@ export function PostDetailView() {
   const { id } = useParams<{ id: string }>();
   const [post, setPost] = useState<Post | null>(null);
   const [versions, setVersions] = useState<PostVersion[]>([]);
+  const [comments, setComments] = useState<Comment[]>([]);
   const [draft, setDraft] = useState("");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -56,7 +57,7 @@ export function PostDetailView() {
     load();
   }, [load]);
 
-  // Snap the versions/comments selection back to latest whenever the version count changes
+  // Snap the versions tab's selection back to latest whenever the version count changes
   // (new draft saved, or a revert happened) — an explicit click on an older version still wins
   // within the current view.
   useEffect(() => {
@@ -64,6 +65,19 @@ export function PostDetailView() {
       setSelectedVersionId(versions[versions.length - 1].id);
     }
   }, [versions.length]);
+
+  const latestVersionId = versions[versions.length - 1]?.id;
+
+  // Comments always target the latest version — that's the one shown in the LinkedIn
+  // preview, which is where you now add them by selecting text.
+  const loadComments = useCallback(async () => {
+    if (!latestVersionId) return;
+    setComments(await api.listComments(latestVersionId));
+  }, [latestVersionId]);
+
+  useEffect(() => {
+    loadComments();
+  }, [loadComments]);
 
   async function handleTransition(toState: Post["state"]) {
     if (!post) return;
@@ -106,7 +120,13 @@ export function PostDetailView() {
 
   const latestVersion = versions[versions.length - 1];
   const dirty = draft !== (latestVersion?.contentMarkdown ?? "");
-  const selectedVersion = versions.find((v) => v.id === selectedVersionId) ?? latestVersion;
+  const commentAnchors: CommentAnchor[] = comments
+    .filter((c) => c.anchorOffset !== null)
+    .map((c) => ({ offset: c.anchorOffset!, length: c.anchorLength ?? 0, resolved: c.resolved }));
+  const commentable =
+    !dirty && latestVersion
+      ? { postVersionId: latestVersion.id, anchors: commentAnchors, onPosted: loadComments }
+      : undefined;
 
   return (
     <div>
@@ -178,9 +198,12 @@ export function PostDetailView() {
           </div>
           <div>
             <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-400">
-              LinkedIn preview
+              LinkedIn preview {commentable && "— select text to comment on it"}
             </p>
-            <LinkedInPreview content={draft} />
+            {dirty && (
+              <p className="mb-2 text-xs text-amber-600">Save your draft to enable commenting on it.</p>
+            )}
+            <LinkedInPreview content={draft} commentable={commentable} />
           </div>
         </div>
       </div>
@@ -211,8 +234,8 @@ export function PostDetailView() {
             onReverted={load}
           />
         )}
-        {tab === "comments" && selectedVersion && (
-          <CommentsPanel postVersionId={selectedVersion.id} content={selectedVersion.contentMarkdown} />
+        {tab === "comments" && latestVersion && (
+          <CommentsPanel postVersionId={latestVersion.id} comments={comments} onChanged={loadComments} />
         )}
         {tab === "reviews" && <ReviewsPanel postId={post.id} postState={post.state} onReviewed={load} />}
         {tab === "attachments" && <AttachmentsPanel postId={post.id} />}
