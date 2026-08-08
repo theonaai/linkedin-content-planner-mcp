@@ -3,6 +3,7 @@ import { Link, useParams } from "react-router-dom";
 import { api } from "../lib/api.js";
 import { NEXT_STATES, STATE_LABELS } from "../lib/stateMachine.js";
 import { StateBadge } from "../components/StateBadge.js";
+import { LinkedInPreview } from "../components/LinkedInPreview.js";
 import type { Post, PostVersion } from "../lib/types.js";
 
 export function PostDetailView() {
@@ -129,22 +130,31 @@ export function PostDetailView() {
           )
         )}
 
-        <textarea
-          className="h-64 w-full resize-y rounded-md border border-gray-300 p-3 font-mono text-sm"
-          value={draft}
-          onChange={(e) => setDraft(e.target.value)}
-          placeholder="Draft content (markdown subset: **bold**, *italic*, bullets)…"
-        />
-
-        <div className="mt-3 flex items-center gap-3">
-          <button
-            onClick={handleSaveDraft}
-            disabled={!dirty || saving}
-            className="rounded-md bg-gray-900 px-4 py-2 text-sm font-medium text-white disabled:opacity-40"
-          >
-            {saving ? "Saving…" : "Save as new version"}
-          </button>
-          <span className="text-xs text-gray-400">{versions.length} version(s)</span>
+        <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+          <div>
+            <textarea
+              className="h-64 w-full resize-y rounded-md border border-gray-300 p-3 font-mono text-sm"
+              value={draft}
+              onChange={(e) => setDraft(e.target.value)}
+              placeholder="Draft content (markdown subset: **bold**, *italic*, bullets)…"
+            />
+            <div className="mt-3 flex items-center gap-3">
+              <button
+                onClick={handleSaveDraft}
+                disabled={!dirty || saving}
+                className="rounded-md bg-gray-900 px-4 py-2 text-sm font-medium text-white disabled:opacity-40"
+              >
+                {saving ? "Saving…" : "Save as new version"}
+              </button>
+              <span className="text-xs text-gray-400">{versions.length} version(s)</span>
+            </div>
+          </div>
+          <div>
+            <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-400">
+              LinkedIn preview
+            </p>
+            <LinkedInPreview content={draft} />
+          </div>
         </div>
       </div>
     </div>
