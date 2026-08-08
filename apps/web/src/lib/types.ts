@@ -30,6 +30,13 @@ export interface Comment {
   resolved: boolean;
   authorId: string | null;
   createdAt: string;
+  /** Anchor position relative to the latest version's content — null when the comment has
+   * no anchor, or its anchored text couldn't be relocated there (see anchorStale). */
+  resolvedAnchorOffset: number | null;
+  resolvedAnchorLength: number | null;
+  /** True only when the comment had an anchor that no longer appears unchanged in the
+   * latest version — i.e. the text it referred to was edited or removed since. */
+  anchorStale: boolean;
 }
 
 export interface Review {

@@ -51,7 +51,7 @@ export const api = {
       body: JSON.stringify({ decision, body }),
     }),
 
-  listComments: (versionId: string) => request<Comment[]>(`/versions/${versionId}/comments`),
+  listCommentsForPost: (postId: string) => request<Comment[]>(`/posts/${postId}/comments`),
   addComment: (
     versionId: string,
     input: { body: string; anchorOffset?: number; anchorLength?: number; parentCommentId?: string },

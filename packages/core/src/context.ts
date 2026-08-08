@@ -9,7 +9,7 @@ import type { StorageAdapter } from "./storage.js";
 export function createCoreServices(db: Db, storage: StorageAdapter) {
   const posts = createPostService(db);
   const versions = createVersionService(db);
-  const comments = createCommentService(db);
+  const comments = createCommentService(db, { versionService: versions });
   const reviews = createReviewService(db, { postService: posts, versionService: versions });
   const attachments = createAttachmentService(db, storage);
 

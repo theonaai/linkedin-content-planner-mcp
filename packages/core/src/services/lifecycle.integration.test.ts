@@ -190,4 +190,66 @@ describe.skipIf(!connectionString)("post lifecycle (integration)", () => {
     const current = await core.posts.setPostState({ postId: post.id, toState: "in_review" });
     expect(current.state).toBe("in_review");
   });
+
+  it("carries a comment's anchor forward when its text is unchanged in a later version, and stales it when the text changes", async () => {
+    const post = await core.posts.createPost({
+      workspaceId,
+      initialContent: "Intro line.\n\nHere's why it matters.\n\nClosing line.",
+    });
+    const v1 = await core.versions.getLatestVersion(post.id);
+    const unchangedOffset = v1.contentMarkdown.indexOf("Here's why it matters.");
+
+    const survivor = await core.comments.addComment({
+      postVersionId: v1.id,
+      body: "Keep this framing.",
+      anchorOffset: unchangedOffset,
+      anchorLength: "Here's why it matters.".length,
+    });
+    const introOffset = v1.contentMarkdown.indexOf("Intro line.");
+    const casualty = await core.comments.addComment({
+      postVersionId: v1.id,
+      body: "This opener is weak.",
+      anchorOffset: introOffset,
+      anchorLength: "Intro line.".length,
+    });
+
+    // Edit only the intro; the "why it matters" sentence is untouched.
+    await core.versions.updatePostContent({
+      postId: post.id,
+      contentMarkdown: "A punchier intro.\n\nHere's why it matters.\n\nClosing line.",
+    });
+    const v2 = await core.versions.getLatestVersion(post.id);
+
+    const resolved = await core.comments.listCommentsForLatestVersion(post.id);
+    const survivorResolved = resolved.find((c) => c.id === survivor.id)!;
+    const casualtyResolved = resolved.find((c) => c.id === casualty.id)!;
+
+    expect(survivorResolved.anchorStale).toBe(false);
+    expect(survivorResolved.resolvedAnchorOffset).toBe(v2.contentMarkdown.indexOf("Here's why it matters."));
+    expect(
+      v2.contentMarkdown.slice(
+        survivorResolved.resolvedAnchorOffset!,
+        survivorResolved.resolvedAnchorOffset! + survivorResolved.resolvedAnchorLength!,
+      ),
+    ).toBe("Here's why it matters.");
+
+    expect(casualtyResolved.anchorStale).toBe(true);
+    expect(casualtyResolved.resolvedAnchorOffset).toBeNull();
+  });
+
+  it("still blocks review submission for an unresolved comment left on an older version", async () => {
+    const post = await core.posts.createPost({ workspaceId, initialContent: "v1 content" });
+    await core.posts.setPostState({ postId: post.id, toState: "todo" });
+    await core.posts.setPostState({ postId: post.id, toState: "in_progress" });
+
+    const v1 = await core.versions.getLatestVersion(post.id);
+    await core.comments.addComment({ postVersionId: v1.id, body: "Fix this before moving on." });
+
+    // Saving a new version must not silently let the old unresolved comment slip past the gate.
+    await core.versions.updatePostContent({ postId: post.id, contentMarkdown: "v2 content, unrelated edit" });
+
+    await expect(core.posts.setPostState({ postId: post.id, toState: "in_review" })).rejects.toThrow(
+      /unresolved comment/i,
+    );
+  });
 });

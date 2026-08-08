@@ -1,4 +1,4 @@
-import { eq, and, gte, lte, inArray, isNull, asc, desc, type SQL } from "drizzle-orm";
+import { eq, and, gte, lte, inArray, isNull, asc, type SQL } from "drizzle-orm";
 import { posts, postVersions, comments, stateEvents, type Db } from "@linkedin-planner/db";
 import { assertTransition } from "../stateMachine.js";
 import { NotFoundError, ValidationError } from "../errors.js";
@@ -12,22 +12,27 @@ export function createPostService(db: Db) {
   }
 
   /** Submitting for review requires every open thread to be addressed first — checked
-   * server-side (not just in the UI) so an agent driving state via MCP is bound by it too. */
+   * server-side (not just in the UI) so an agent driving state via MCP is bound by it too.
+   * Checked across every version of the post, not just the latest: a comment left on an
+   * earlier draft still represents open feedback (and still carries forward onto the
+   * latest version wherever its anchored text is unchanged — see comments service), so
+   * saving a new version must not silently let an unresolved thread slip past this gate. */
   async function assertNoUnresolvedComments(postId: string) {
-    const [latestVersion] = await db
-      .select()
+    const versionRows = await db
+      .select({ id: postVersions.id })
       .from(postVersions)
-      .where(eq(postVersions.postId, postId))
-      .orderBy(desc(postVersions.createdAt))
-      .limit(1);
-    if (!latestVersion) return;
+      .where(eq(postVersions.postId, postId));
+    if (versionRows.length === 0) return;
 
     const unresolved = await db
       .select()
       .from(comments)
       .where(
         and(
-          eq(comments.postVersionId, latestVersion.id),
+          inArray(
+            comments.postVersionId,
+            versionRows.map((v) => v.id),
+          ),
           isNull(comments.parentCommentId),
           eq(comments.resolved, false),
         ),

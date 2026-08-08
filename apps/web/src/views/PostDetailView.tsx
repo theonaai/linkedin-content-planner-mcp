@@ -66,18 +66,19 @@ export function PostDetailView() {
     }
   }, [versions.length]);
 
-  const latestVersionId = versions[versions.length - 1]?.id;
-
-  // Comments always target the latest version — that's the one shown in the LinkedIn
-  // preview, which is where you now add them by selecting text.
+  // Comments span every version of the post — carried forward onto the latest version's
+  // content wherever their anchored text is unchanged (like git blame following a line).
   const loadComments = useCallback(async () => {
-    if (!latestVersionId) return;
-    setComments(await api.listComments(latestVersionId));
-  }, [latestVersionId]);
+    if (!id) return;
+    setComments(await api.listCommentsForPost(id));
+  }, [id]);
 
+  // Re-resolve comment anchors whenever the version count changes (new version saved, or a
+  // revert) — the previously-fetched anchors were remapped against the *old* latest version
+  // and would otherwise render against the new content at the wrong position.
   useEffect(() => {
     loadComments();
-  }, [loadComments]);
+  }, [loadComments, versions.length]);
 
   async function handleTransition(toState: Post["state"]) {
     if (!post) return;

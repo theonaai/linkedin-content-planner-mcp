@@ -21,11 +21,19 @@ function CommentThread({
         comment.resolved ? "border-gray-200 bg-gray-50 opacity-60" : "border-gray-300 bg-white"
       }`}
     >
-      {comment.anchorOffset !== null && (
-        <div className="mb-1 inline-block rounded bg-amber-50 px-1.5 py-0.5 text-[11px] text-amber-700">
-          anchored on preview
-        </div>
-      )}
+      {comment.anchorOffset !== null &&
+        (comment.anchorStale ? (
+          <div
+            className="mb-1 inline-block rounded bg-gray-100 px-1.5 py-0.5 text-[11px] text-gray-500"
+            title="The text this comment referred to has been edited or removed since"
+          >
+            text changed since this comment
+          </div>
+        ) : (
+          <div className="mb-1 inline-block rounded bg-amber-50 px-1.5 py-0.5 text-[11px] text-amber-700">
+            anchored on preview
+          </div>
+        ))}
       <p className="text-gray-800">{comment.body}</p>
       <div className="mt-1 flex items-center gap-2 text-[11px] text-gray-400">
         <span>{new Date(comment.createdAt).toLocaleString()}</span>

@@ -147,10 +147,13 @@ export function createMcpServer(core: CoreServices, workspaceId: string): McpSer
   server.registerTool(
     "list_comments",
     {
-      description: "List comments on a post version, oldest first.",
-      inputSchema: { postVersionId: z.string().uuid() },
+      description:
+        "List all comments on a post (across every version), oldest first. Anchors are resolved onto " +
+        "the latest version wherever the commented text is unchanged (resolvedAnchorOffset/Length); " +
+        "anchorStale is true when the text a comment referred to was edited or removed since.",
+      inputSchema: { postId: z.string().uuid() },
     },
-    (args) => safe(() => core.comments.listComments(args.postVersionId))(),
+    (args) => safe(() => core.comments.listCommentsForLatestVersion(args.postId))(),
   );
 
   server.registerTool(

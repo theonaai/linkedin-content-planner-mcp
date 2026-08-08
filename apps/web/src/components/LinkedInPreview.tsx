@@ -218,8 +218,13 @@ export function LinkedInPreview({ content, commentable }: { content: string; com
   const visibleText = cutoff === null ? formatted : formatted.slice(0, cutoff);
   const hiddenText = cutoff === null ? "" : formatted.slice(cutoff);
   const anchors: ResolvedAnchor[] = (commentable?.comments ?? [])
-    .filter((c) => !c.parentCommentId && c.anchorOffset !== null)
-    .map((c) => ({ commentId: c.id, offset: c.anchorOffset!, length: c.anchorLength ?? 0, resolved: c.resolved }));
+    .filter((c) => !c.parentCommentId && c.resolvedAnchorOffset !== null)
+    .map((c) => ({
+      commentId: c.id,
+      offset: c.resolvedAnchorOffset!,
+      length: c.resolvedAnchorLength ?? 0,
+      resolved: c.resolved,
+    }));
   const visibleAnchors = clipAnchors(anchors, 0, cutoff ?? formatted.length);
   const hiddenAnchors = cutoff !== null ? clipAnchors(anchors, cutoff, formatted.length) : [];
 
