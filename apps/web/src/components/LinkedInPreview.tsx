@@ -3,6 +3,7 @@ import { toLinkedInPreview } from "@linkedin-planner/formatting";
 import { CommentIcon, GlobeIcon, RepostIcon, SendIcon, ThumbsUpIcon, UserAvatarIcon } from "./icons.js";
 
 const LINKEDIN_BLUE = "#0a66c2";
+const TEXT_CLASSES = "whitespace-pre-wrap text-sm leading-normal text-gray-900";
 
 const HASHTAG_SPLIT = /(#[\p{L}\p{N}_]+)/gu;
 const HASHTAG_MATCH = /^#[\p{L}\p{N}_]+$/u;
@@ -19,21 +20,42 @@ function renderWithHashtags(text: string): ReactNode[] {
   );
 }
 
+/** Binary-searches the character offset where `fullText` would wrap onto a 4th line,
+ * using a same-width/font hidden element as the ruler. Returns null if it already fits. */
+function findClampCutoff(measureEl: HTMLDivElement, fullText: string, maxHeight: number): number | null {
+  measureEl.textContent = fullText;
+  if (measureEl.getBoundingClientRect().height <= maxHeight + 1) return null;
+
+  let lo = 0;
+  let hi = fullText.length;
+  while (lo < hi) {
+    const mid = Math.ceil((lo + hi) / 2);
+    measureEl.textContent = fullText.slice(0, mid);
+    const fits = measureEl.getBoundingClientRect().height <= maxHeight + 1;
+    if (fits) lo = mid;
+    else hi = mid - 1;
+  }
+  return lo;
+}
+
 export function LinkedInPreview({ content }: { content: string }) {
   const formatted = toLinkedInPreview(content);
-  const contentRef = useRef<HTMLDivElement>(null);
-  const [expanded, setExpanded] = useState(false);
-  const [isOverflowing, setIsOverflowing] = useState(false);
+  const clampRulerRef = useRef<HTMLDivElement>(null);
+  const measureRulerRef = useRef<HTMLDivElement>(null);
+  const [cutoff, setCutoff] = useState<number | null>(null);
 
   useLayoutEffect(() => {
-    setExpanded(false);
+    const clampEl = clampRulerRef.current;
+    const measureEl = measureRulerRef.current;
+    if (!clampEl || !measureEl || !formatted) {
+      setCutoff(null);
+      return;
+    }
+    setCutoff(findClampCutoff(measureEl, formatted, clampEl.clientHeight));
   }, [formatted]);
 
-  useLayoutEffect(() => {
-    const el = contentRef.current;
-    if (!el || expanded) return;
-    setIsOverflowing(el.scrollHeight > el.clientHeight + 1);
-  }, [formatted, expanded]);
+  const visibleText = cutoff === null ? formatted : formatted.slice(0, cutoff);
+  const hiddenText = cutoff === null ? "" : formatted.slice(cutoff);
 
   return (
     <div className="overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm">
@@ -52,22 +74,28 @@ export function LinkedInPreview({ content }: { content: string }) {
         </div>
       </div>
 
-      <div className="px-4 pb-1 pt-3">
+      <div className="relative px-4 pb-1 pt-3">
+        {/* Invisible rulers, laid out at the same width as the visible text, used only to
+            measure where LinkedIn's real 3-line clamp would cut this content. */}
+        <div ref={clampRulerRef} aria-hidden className={`${TEXT_CLASSES} invisible absolute inset-x-4 top-0 -z-10 line-clamp-3`}>
+          {formatted}
+        </div>
+        <div ref={measureRulerRef} aria-hidden className={`${TEXT_CLASSES} invisible absolute inset-x-4 top-0 -z-10`} />
+
         {formatted ? (
           <>
-            <div
-              ref={contentRef}
-              className={`whitespace-pre-wrap text-sm leading-normal text-gray-900 ${expanded ? "" : "line-clamp-3"}`}
-            >
-              {renderWithHashtags(formatted)}
+            <div className={TEXT_CLASSES}>
+              {renderWithHashtags(visibleText)}
+              {cutoff !== null && <span className="font-medium text-gray-500">…more</span>}
             </div>
-            {isOverflowing && !expanded && (
-              <button
-                onClick={() => setExpanded(true)}
-                className="mt-0.5 text-sm font-medium text-gray-500 hover:underline"
-              >
-                …more
-              </button>
+            {cutoff !== null && (
+              <>
+                <div className="my-2 border-t border-dashed border-gray-300" />
+                <p className="mb-1 text-[11px] text-gray-400">
+                  Below the fold — hidden behind “…more” in the real feed:
+                </p>
+                <div className={TEXT_CLASSES}>{renderWithHashtags(hiddenText)}</div>
+              </>
             )}
           </>
         ) : (
