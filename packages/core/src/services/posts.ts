@@ -1,7 +1,7 @@
-import { eq, and, gte, lte, inArray, asc, type SQL } from "drizzle-orm";
-import { posts, postVersions, stateEvents, type Db } from "@linkedin-planner/db";
+import { eq, and, gte, lte, inArray, isNull, asc, desc, type SQL } from "drizzle-orm";
+import { posts, postVersions, comments, stateEvents, type Db } from "@linkedin-planner/db";
 import { assertTransition } from "../stateMachine.js";
-import { NotFoundError } from "../errors.js";
+import { NotFoundError, ValidationError } from "../errors.js";
 import type { PostState, Platform } from "../types.js";
 
 export function createPostService(db: Db) {
@@ -9,6 +9,34 @@ export function createPostService(db: Db) {
     const [post] = await db.select().from(posts).where(eq(posts.id, postId)).limit(1);
     if (!post) throw new NotFoundError("Post", postId);
     return post;
+  }
+
+  /** Submitting for review requires every open thread to be addressed first — checked
+   * server-side (not just in the UI) so an agent driving state via MCP is bound by it too. */
+  async function assertNoUnresolvedComments(postId: string) {
+    const [latestVersion] = await db
+      .select()
+      .from(postVersions)
+      .where(eq(postVersions.postId, postId))
+      .orderBy(desc(postVersions.createdAt))
+      .limit(1);
+    if (!latestVersion) return;
+
+    const unresolved = await db
+      .select()
+      .from(comments)
+      .where(
+        and(
+          eq(comments.postVersionId, latestVersion.id),
+          isNull(comments.parentCommentId),
+          eq(comments.resolved, false),
+        ),
+      );
+    if (unresolved.length > 0) {
+      throw new ValidationError(
+        `Cannot submit for review: ${unresolved.length} unresolved comment(s) remain.`,
+      );
+    }
   }
 
   return {
@@ -68,6 +96,9 @@ export function createPostService(db: Db) {
     async setPostState(params: { postId: string; toState: PostState; actorId?: string }) {
       const post = await getPost(params.postId);
       assertTransition(post.state, params.toState);
+      if (params.toState === "in_review") {
+        await assertNoUnresolvedComments(params.postId);
+      }
 
       const [updated] = await db
         .update(posts)

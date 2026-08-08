@@ -1,6 +1,7 @@
 import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import { toLinkedInPreview } from "@linkedin-planner/formatting";
 import { api } from "../lib/api.js";
+import type { Comment } from "../lib/types.js";
 import { CommentIcon, GlobeIcon, RepostIcon, SendIcon, ThumbsUpIcon, UserAvatarIcon } from "./icons.js";
 
 const LINKEDIN_BLUE = "#0a66c2";
@@ -9,7 +10,8 @@ const TEXT_CLASSES = "whitespace-pre-wrap text-sm leading-normal text-gray-900";
 const HASHTAG_SPLIT = /(#[\p{L}\p{N}_]+)/gu;
 const HASHTAG_MATCH = /^#[\p{L}\p{N}_]+$/u;
 
-export interface CommentAnchor {
+interface ResolvedAnchor {
+  commentId: string;
   offset: number;
   length: number;
   resolved: boolean;
@@ -17,17 +19,15 @@ export interface CommentAnchor {
 
 export interface CommentableConfig {
   postVersionId: string;
-  anchors: CommentAnchor[];
-  onPosted: () => void;
+  /** All comments (roots + replies) on postVersionId — used both to draw highlights and
+   * to render the click-to-view thread popover. */
+  comments: Comment[];
+  onChanged: () => void;
 }
 
-interface PendingSelection {
-  offset: number;
-  length: number;
-  text: string;
-  top: number;
-  left: number;
-}
+type Overlay =
+  | { type: "compose"; offset: number; length: number; text: string; top: number; left: number }
+  | { type: "thread"; commentId: string; top: number; left: number };
 
 function renderWithHashtags(text: string, keyPrefix: string): ReactNode[] {
   return text.split(HASHTAG_SPLIT).map((part, i) =>
@@ -41,7 +41,12 @@ function renderWithHashtags(text: string, keyPrefix: string): ReactNode[] {
   );
 }
 
-function renderAnnotated(text: string, anchors: CommentAnchor[], keyPrefix: string): ReactNode[] {
+function renderAnnotated(
+  text: string,
+  anchors: ResolvedAnchor[],
+  keyPrefix: string,
+  onMarkClick: (commentId: string, el: HTMLElement) => void,
+): ReactNode[] {
   if (anchors.length === 0) return renderWithHashtags(text, keyPrefix);
   const sorted = [...anchors].sort((a, b) => a.offset - b.offset);
   const nodes: ReactNode[] = [];
@@ -52,7 +57,11 @@ function renderAnnotated(text: string, anchors: CommentAnchor[], keyPrefix: stri
     if (start > cursor) nodes.push(...renderWithHashtags(text.slice(cursor, start), `${keyPrefix}-p${i}`));
     if (end > start) {
       nodes.push(
-        <mark key={`${keyPrefix}-h${i}`} className={a.resolved ? "bg-gray-200" : "bg-amber-200/70"}>
+        <mark
+          key={`${keyPrefix}-h${i}`}
+          onClick={(e) => onMarkClick(a.commentId, e.currentTarget)}
+          className={`cursor-pointer ${a.resolved ? "bg-gray-200 hover:bg-gray-300" : "bg-amber-200/70 hover:bg-amber-300/70"}`}
+        >
           {renderWithHashtags(text.slice(start, end), `${keyPrefix}-h${i}t`)}
         </mark>,
       );
@@ -65,15 +74,15 @@ function renderAnnotated(text: string, anchors: CommentAnchor[], keyPrefix: stri
 
 /** Clips/rebases anchors to the [rangeStart, rangeEnd) window (used to split anchors across
  * the visible/below-the-fold halves, which are separate DOM subtrees). */
-function clipAnchors(anchors: CommentAnchor[], rangeStart: number, rangeEnd: number): CommentAnchor[] {
+function clipAnchors(anchors: ResolvedAnchor[], rangeStart: number, rangeEnd: number): ResolvedAnchor[] {
   return anchors
     .map((a) => {
       const start = Math.max(a.offset, rangeStart);
       const end = Math.min(a.offset + a.length, rangeEnd);
       if (end <= start) return null;
-      return { offset: start - rangeStart, length: end - start, resolved: a.resolved };
+      return { commentId: a.commentId, offset: start - rangeStart, length: end - start, resolved: a.resolved };
     })
-    .filter((a): a is CommentAnchor => a !== null);
+    .filter((a): a is ResolvedAnchor => a !== null);
 }
 
 /** Binary-searches the character offset where `fullText` would wrap onto a 4th line,
@@ -102,9 +111,9 @@ export function LinkedInPreview({ content, commentable }: { content: string; com
   const visibleRef = useRef<HTMLDivElement>(null);
   const hiddenRef = useRef<HTMLDivElement>(null);
   const [cutoff, setCutoff] = useState<number | null>(null);
-  const [pending, setPending] = useState<PendingSelection | null>(null);
-  const [composerOpen, setComposerOpen] = useState(false);
+  const [overlay, setOverlay] = useState<Overlay | null>(null);
   const [composerText, setComposerText] = useState("");
+  const [replyText, setReplyText] = useState("");
 
   useLayoutEffect(() => {
     const clampEl = clampRulerRef.current;
@@ -117,38 +126,37 @@ export function LinkedInPreview({ content, commentable }: { content: string; com
   }, [formatted]);
 
   useEffect(() => {
-    setPending(null);
-    setComposerOpen(false);
+    setOverlay(null);
     setComposerText("");
+    setReplyText("");
   }, [content]);
 
   useEffect(() => {
-    if (!pending) return;
+    if (!overlay) return;
     function onDocMouseDown(e: MouseEvent) {
       if (contentAreaRef.current && !contentAreaRef.current.contains(e.target as Node)) {
-        setPending(null);
-        setComposerOpen(false);
+        setOverlay(null);
       }
     }
     document.addEventListener("mousedown", onDocMouseDown);
     return () => document.removeEventListener("mousedown", onDocMouseDown);
-  }, [pending]);
+  }, [overlay]);
 
   function handleMouseUp(containerRef: React.RefObject<HTMLDivElement | null>, baseOffset: number) {
-    if (!commentable || composerOpen) return;
+    if (!commentable || overlay?.type === "compose") return;
     const sel = window.getSelection();
     if (!sel || sel.isCollapsed || !containerRef.current || sel.rangeCount === 0) {
-      setPending(null);
+      if (overlay?.type !== "thread") setOverlay(null);
       return;
     }
     const range = sel.getRangeAt(0);
     if (!containerRef.current.contains(range.commonAncestorContainer)) {
-      setPending(null);
+      setOverlay(null);
       return;
     }
     const text = range.toString();
     if (!text) {
-      setPending(null);
+      setOverlay(null);
       return;
     }
     const preRange = document.createRange();
@@ -156,7 +164,8 @@ export function LinkedInPreview({ content, commentable }: { content: string; com
     preRange.setEnd(range.startContainer, range.startOffset);
     const rect = range.getBoundingClientRect();
     const areaRect = contentAreaRef.current!.getBoundingClientRect();
-    setPending({
+    setOverlay({
+      type: "compose",
       offset: baseOffset + preRange.toString().length,
       length: text.length,
       text,
@@ -165,25 +174,60 @@ export function LinkedInPreview({ content, commentable }: { content: string; com
     });
   }
 
-  async function submitPending() {
-    if (!pending || !composerText.trim() || !commentable) return;
+  function handleMarkClick(commentId: string, el: HTMLElement) {
+    const sel = window.getSelection();
+    if (sel && !sel.isCollapsed && sel.toString()) return;
+    if (!contentAreaRef.current) return;
+    const rect = el.getBoundingClientRect();
+    const areaRect = contentAreaRef.current.getBoundingClientRect();
+    setReplyText("");
+    setOverlay({
+      type: "thread",
+      commentId,
+      top: rect.bottom - areaRect.top,
+      left: Math.max(0, rect.left - areaRect.left),
+    });
+  }
+
+  async function submitCompose() {
+    if (!commentable || overlay?.type !== "compose" || !composerText.trim()) return;
     await api.addComment(commentable.postVersionId, {
       body: composerText.trim(),
-      anchorOffset: pending.offset,
-      anchorLength: pending.length,
+      anchorOffset: overlay.offset,
+      anchorLength: overlay.length,
     });
-    setPending(null);
-    setComposerOpen(false);
+    setOverlay(null);
     setComposerText("");
     window.getSelection()?.removeAllRanges();
-    commentable.onPosted();
+    commentable.onChanged();
+  }
+
+  async function submitReply(commentId: string) {
+    if (!commentable || !replyText.trim()) return;
+    await api.addComment(commentable.postVersionId, { body: replyText.trim(), parentCommentId: commentId });
+    setReplyText("");
+    commentable.onChanged();
+  }
+
+  async function toggleResolve(comment: Comment) {
+    if (!commentable) return;
+    await api.resolveComment(comment.id, !comment.resolved);
+    commentable.onChanged();
   }
 
   const visibleText = cutoff === null ? formatted : formatted.slice(0, cutoff);
   const hiddenText = cutoff === null ? "" : formatted.slice(cutoff);
-  const anchors = commentable?.anchors ?? [];
+  const anchors: ResolvedAnchor[] = (commentable?.comments ?? [])
+    .filter((c) => !c.parentCommentId && c.anchorOffset !== null)
+    .map((c) => ({ commentId: c.id, offset: c.anchorOffset!, length: c.anchorLength ?? 0, resolved: c.resolved }));
   const visibleAnchors = clipAnchors(anchors, 0, cutoff ?? formatted.length);
   const hiddenAnchors = cutoff !== null ? clipAnchors(anchors, cutoff, formatted.length) : [];
+
+  const threadComment =
+    overlay?.type === "thread" ? commentable?.comments.find((c) => c.id === overlay.commentId) : undefined;
+  const threadReplies = threadComment
+    ? (commentable?.comments ?? []).filter((c) => c.parentCommentId === threadComment.id)
+    : [];
 
   return (
     <div className="overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm">
@@ -218,7 +262,7 @@ export function LinkedInPreview({ content, commentable }: { content: string; com
                 onMouseUp={() => handleMouseUp(visibleRef, 0)}
                 className={commentable ? `${TEXT_CLASSES} cursor-text` : TEXT_CLASSES}
               >
-                {renderAnnotated(visibleText, visibleAnchors, "v")}
+                {renderAnnotated(visibleText, visibleAnchors, "v", handleMarkClick)}
               </div>
               {cutoff !== null && (
                 <span className="absolute bottom-0 right-0 bg-white pl-1 text-sm font-medium text-gray-500">
@@ -234,27 +278,18 @@ export function LinkedInPreview({ content, commentable }: { content: string; com
                   onMouseUp={() => handleMouseUp(hiddenRef, cutoff)}
                   className={commentable ? `${TEXT_CLASSES} cursor-text` : TEXT_CLASSES}
                 >
-                  {renderAnnotated(hiddenText, hiddenAnchors, "h")}
+                  {renderAnnotated(hiddenText, hiddenAnchors, "h", handleMarkClick)}
                 </div>
               </>
             )}
 
-            {pending && !composerOpen && (
-              <button
-                style={{ top: Math.max(0, pending.top - 34), left: pending.left }}
-                className="absolute z-10 flex items-center gap-1 rounded-md bg-gray-900 px-2.5 py-1.5 text-xs font-medium text-white shadow-lg hover:bg-gray-800"
-                onClick={() => setComposerOpen(true)}
-              >
-                💬 Comment
-              </button>
-            )}
-            {pending && composerOpen && (
+            {overlay?.type === "compose" && (
               <div
-                style={{ top: Math.max(0, pending.top - 34), left: pending.left }}
+                style={{ top: Math.max(0, overlay.top - 34), left: overlay.left }}
                 className="absolute z-10 w-72 rounded-md border border-gray-200 bg-white p-2 shadow-lg"
               >
                 <p className="mb-1 truncate text-[11px] text-gray-500">
-                  On: “{pending.text.length > 50 ? `${pending.text.slice(0, 50)}…` : pending.text}”
+                  On: “{overlay.text.length > 50 ? `${overlay.text.slice(0, 50)}…` : overlay.text}”
                 </p>
                 <textarea
                   autoFocus
@@ -267,8 +302,7 @@ export function LinkedInPreview({ content, commentable }: { content: string; com
                 <div className="mt-1 flex justify-end gap-1">
                   <button
                     onClick={() => {
-                      setPending(null);
-                      setComposerOpen(false);
+                      setOverlay(null);
                       setComposerText("");
                     }}
                     className="rounded px-2 py-1 text-[11px] text-gray-600 hover:bg-gray-100"
@@ -276,11 +310,51 @@ export function LinkedInPreview({ content, commentable }: { content: string; com
                     Cancel
                   </button>
                   <button
-                    onClick={submitPending}
+                    onClick={submitCompose}
                     disabled={!composerText.trim()}
                     className="rounded bg-gray-900 px-2 py-1 text-[11px] text-white disabled:opacity-40"
                   >
                     Post
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {overlay?.type === "thread" && threadComment && (
+              <div
+                style={{ top: overlay.top + 4, left: overlay.left }}
+                className="absolute z-10 w-72 rounded-md border border-gray-200 bg-white p-2 shadow-lg"
+              >
+                <p className="text-xs text-gray-800">{threadComment.body}</p>
+                <div className="mt-1 flex items-center gap-2 text-[11px] text-gray-400">
+                  <span>{new Date(threadComment.createdAt).toLocaleString()}</span>
+                  <button onClick={() => toggleResolve(threadComment)} className="text-blue-600 hover:underline">
+                    {threadComment.resolved ? "Unresolve" : "Resolve"}
+                  </button>
+                </div>
+                {threadReplies.length > 0 && (
+                  <div className="mt-2 flex flex-col gap-1.5 border-t border-gray-100 pt-2">
+                    {threadReplies.map((r) => (
+                      <div key={r.id} className="text-[11px] text-gray-700">
+                        <p>{r.body}</p>
+                        <span className="text-gray-400">{new Date(r.createdAt).toLocaleString()}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+                <div className="mt-2 flex gap-1">
+                  <input
+                    className="flex-1 rounded border border-gray-200 px-1.5 py-1 text-[11px]"
+                    placeholder="Reply…"
+                    value={replyText}
+                    onChange={(e) => setReplyText(e.target.value)}
+                  />
+                  <button
+                    onClick={() => submitReply(threadComment.id)}
+                    disabled={!replyText.trim()}
+                    className="rounded bg-gray-100 px-2 text-[11px] text-gray-700 hover:bg-gray-200 disabled:opacity-40"
+                  >
+                    Reply
                   </button>
                 </div>
               </div>

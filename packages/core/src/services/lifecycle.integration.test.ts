@@ -160,4 +160,34 @@ describe.skipIf(!connectionString)("post lifecycle (integration)", () => {
     await core.attachments.deleteAttachment(attachment.id);
     expect(await core.attachments.listAttachments(post.id)).toHaveLength(0);
   });
+
+  it("blocks submitting for review while a comment on the latest version is unresolved", async () => {
+    const post = await core.posts.createPost({ workspaceId, initialContent: "draft" });
+    await core.posts.setPostState({ postId: post.id, toState: "todo" });
+    await core.posts.setPostState({ postId: post.id, toState: "in_progress" });
+
+    const version = await core.versions.getLatestVersion(post.id);
+    const comment = await core.comments.addComment({
+      postVersionId: version.id,
+      body: "This needs a stronger hook.",
+    });
+
+    await expect(core.posts.setPostState({ postId: post.id, toState: "in_review" })).rejects.toThrow(
+      /unresolved comment/i,
+    );
+
+    // A reply alone shouldn't unblock it — only resolving the thread does.
+    await core.comments.addComment({
+      postVersionId: version.id,
+      body: "Working on it.",
+      parentCommentId: comment.id,
+    });
+    await expect(core.posts.setPostState({ postId: post.id, toState: "in_review" })).rejects.toThrow(
+      /unresolved comment/i,
+    );
+
+    await core.comments.resolveComment({ commentId: comment.id, resolved: true });
+    const current = await core.posts.setPostState({ postId: post.id, toState: "in_review" });
+    expect(current.state).toBe("in_review");
+  });
 });

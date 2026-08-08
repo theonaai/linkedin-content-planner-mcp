@@ -5,7 +5,7 @@ import { NEXT_STATES, STATE_LABELS } from "../lib/stateMachine.js";
 import { formatDateDisplay } from "../lib/dates.js";
 import { useAutosizeTextarea } from "../lib/useAutosizeTextarea.js";
 import { StateBadge } from "../components/StateBadge.js";
-import { LinkedInPreview, type CommentAnchor } from "../components/LinkedInPreview.js";
+import { LinkedInPreview } from "../components/LinkedInPreview.js";
 import { VersionsPanel } from "../components/VersionsPanel.js";
 import { CommentsPanel } from "../components/CommentsPanel.js";
 import { ReviewsPanel } from "../components/ReviewsPanel.js";
@@ -120,13 +120,11 @@ export function PostDetailView() {
 
   const latestVersion = versions[versions.length - 1];
   const dirty = draft !== (latestVersion?.contentMarkdown ?? "");
-  const commentAnchors: CommentAnchor[] = comments
-    .filter((c) => c.anchorOffset !== null)
-    .map((c) => ({ offset: c.anchorOffset!, length: c.anchorLength ?? 0, resolved: c.resolved }));
   const commentable =
     !dirty && latestVersion
-      ? { postVersionId: latestVersion.id, anchors: commentAnchors, onPosted: loadComments }
+      ? { postVersionId: latestVersion.id, comments, onChanged: loadComments }
       : undefined;
+  const unresolvedCount = comments.filter((c) => !c.parentCommentId && !c.resolved).length;
 
   return (
     <div>
@@ -163,16 +161,26 @@ export function PostDetailView() {
         {error && <p className="mb-3 text-sm text-red-600">{error}</p>}
 
         {NEXT_STATES[post.state].length > 0 && (
-          <div className="mb-4 flex gap-2">
-            {NEXT_STATES[post.state].map((next) => (
-              <button
-                key={next}
-                onClick={() => handleTransition(next)}
-                className="rounded-md border border-gray-300 px-3 py-1 text-sm text-gray-700 hover:bg-gray-100"
-              >
-                Move to {STATE_LABELS[next]}
-              </button>
-            ))}
+          <div className="mb-4 flex flex-wrap items-center gap-2">
+            {NEXT_STATES[post.state].map((next) => {
+              const blocked = next === "in_review" && unresolvedCount > 0;
+              return (
+                <button
+                  key={next}
+                  onClick={() => handleTransition(next)}
+                  disabled={blocked}
+                  title={blocked ? `Resolve ${unresolvedCount} open comment(s) first` : undefined}
+                  className="rounded-md border border-gray-300 px-3 py-1 text-sm text-gray-700 hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent"
+                >
+                  Move to {STATE_LABELS[next]}
+                </button>
+              );
+            })}
+            {NEXT_STATES[post.state].includes("in_review") && unresolvedCount > 0 && (
+              <span className="text-xs text-amber-600">
+                Resolve {unresolvedCount} open comment{unresolvedCount === 1 ? "" : "s"} before submitting for review.
+              </span>
+            )}
           </div>
         )}
 
