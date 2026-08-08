@@ -84,16 +84,17 @@ export function LinkedInPreview({ content }: { content: string }) {
 
         {formatted ? (
           <>
-            <div className={TEXT_CLASSES}>
-              {renderWithHashtags(visibleText)}
-              {cutoff !== null && <span className="font-medium text-gray-500">…more</span>}
+            <div className="relative">
+              <div className={TEXT_CLASSES}>{renderWithHashtags(visibleText)}</div>
+              {cutoff !== null && (
+                <span className="absolute bottom-0 right-0 bg-white pl-1 text-sm font-medium text-gray-500">
+                  …more
+                </span>
+              )}
             </div>
             {cutoff !== null && (
               <>
                 <div className="my-2 border-t border-dashed border-gray-300" />
-                <p className="mb-1 text-[11px] text-gray-400">
-                  Below the fold — hidden behind “…more” in the real feed:
-                </p>
                 <div className={TEXT_CLASSES}>{renderWithHashtags(hiddenText)}</div>
               </>
             )}
