@@ -4,7 +4,18 @@ import { api } from "../lib/api.js";
 import { NEXT_STATES, STATE_LABELS } from "../lib/stateMachine.js";
 import { StateBadge } from "../components/StateBadge.js";
 import { LinkedInPreview } from "../components/LinkedInPreview.js";
+import { VersionsPanel } from "../components/VersionsPanel.js";
+import { CommentsPanel } from "../components/CommentsPanel.js";
+import { ReviewsPanel } from "../components/ReviewsPanel.js";
 import type { Post, PostVersion } from "../lib/types.js";
+
+type Tab = "versions" | "comments" | "reviews";
+
+const TABS: { id: Tab; label: string }[] = [
+  { id: "versions", label: "Versions" },
+  { id: "comments", label: "Comments" },
+  { id: "reviews", label: "Reviews" },
+];
 
 export function PostDetailView() {
   const { id } = useParams<{ id: string }>();
@@ -15,6 +26,8 @@ export function PostDetailView() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const [tab, setTab] = useState<Tab>("versions");
+  const [selectedVersionId, setSelectedVersionId] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     if (!id) return;
@@ -36,6 +49,15 @@ export function PostDetailView() {
   useEffect(() => {
     load();
   }, [load]);
+
+  // Snap the versions/comments selection back to latest whenever the version count changes
+  // (new draft saved, or a revert happened) — an explicit click on an older version still wins
+  // within the current view.
+  useEffect(() => {
+    if (versions.length > 0) {
+      setSelectedVersionId(versions[versions.length - 1].id);
+    }
+  }, [versions.length]);
 
   async function handleTransition(toState: Post["state"]) {
     if (!post) return;
@@ -78,6 +100,7 @@ export function PostDetailView() {
 
   const latestVersion = versions[versions.length - 1];
   const dirty = draft !== (latestVersion?.contentMarkdown ?? "");
+  const selectedVersion = versions.find((v) => v.id === selectedVersionId) ?? latestVersion;
 
   return (
     <div>
@@ -108,26 +131,18 @@ export function PostDetailView() {
 
         {error && <p className="mb-3 text-sm text-red-600">{error}</p>}
 
-        {post.state === "in_review" ? (
-          <p className="mb-3 rounded-md bg-purple-50 px-3 py-2 text-sm text-purple-800">
-            Awaiting review. Approve / request-changes actions land in Phase 6 — for now, use the
-            <code className="mx-1 rounded bg-purple-100 px-1">submit_review</code>
-            MCP tool or the REST API.
-          </p>
-        ) : (
-          NEXT_STATES[post.state].length > 0 && (
-            <div className="mb-4 flex gap-2">
-              {NEXT_STATES[post.state].map((next) => (
-                <button
-                  key={next}
-                  onClick={() => handleTransition(next)}
-                  className="rounded-md border border-gray-300 px-3 py-1 text-sm text-gray-700 hover:bg-gray-100"
-                >
-                  Move to {STATE_LABELS[next]}
-                </button>
-              ))}
-            </div>
-          )
+        {NEXT_STATES[post.state].length > 0 && (
+          <div className="mb-4 flex gap-2">
+            {NEXT_STATES[post.state].map((next) => (
+              <button
+                key={next}
+                onClick={() => handleTransition(next)}
+                className="rounded-md border border-gray-300 px-3 py-1 text-sm text-gray-700 hover:bg-gray-100"
+              >
+                Move to {STATE_LABELS[next]}
+              </button>
+            ))}
+          </div>
         )}
 
         <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
@@ -156,6 +171,38 @@ export function PostDetailView() {
             <LinkedInPreview content={draft} />
           </div>
         </div>
+      </div>
+
+      <div className="mt-4 rounded-lg bg-white p-4 shadow-sm">
+        <div className="mb-4 flex gap-1 border-b border-gray-200">
+          {TABS.map((t) => (
+            <button
+              key={t.id}
+              onClick={() => setTab(t.id)}
+              className={`px-3 py-2 text-sm font-medium ${
+                tab === t.id
+                  ? "border-b-2 border-gray-900 text-gray-900"
+                  : "text-gray-500 hover:text-gray-700"
+              }`}
+            >
+              {t.label}
+            </button>
+          ))}
+        </div>
+
+        {tab === "versions" && (
+          <VersionsPanel
+            postId={post.id}
+            versions={versions}
+            selectedVersionId={selectedVersionId}
+            onSelectVersion={setSelectedVersionId}
+            onReverted={load}
+          />
+        )}
+        {tab === "comments" && selectedVersion && (
+          <CommentsPanel postVersionId={selectedVersion.id} content={selectedVersion.contentMarkdown} />
+        )}
+        {tab === "reviews" && <ReviewsPanel postId={post.id} postState={post.state} onReviewed={load} />}
       </div>
     </div>
   );
