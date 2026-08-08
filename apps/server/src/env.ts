@@ -6,5 +6,6 @@ export function loadEnv() {
   return {
     port: Number(process.env.PORT ?? 3210),
     databaseUrl,
+    attachmentsDir: process.env.ATTACHMENTS_DIR ?? "./data/attachments",
   };
 }

@@ -4,6 +4,24 @@ import { eq } from "drizzle-orm";
 import { createCoreServices, type CoreServices } from "../context.js";
 import { ValidationError } from "../errors.js";
 import { InvalidStateTransitionError } from "../stateMachine.js";
+import type { StorageAdapter } from "../storage.js";
+
+function createInMemoryStorage(): StorageAdapter {
+  const files = new Map<string, Buffer>();
+  return {
+    async save(key, data) {
+      files.set(key, data);
+    },
+    async read(key) {
+      const data = files.get(key);
+      if (!data) throw new Error(`No such key: ${key}`);
+      return data;
+    },
+    async delete(key) {
+      files.delete(key);
+    },
+  };
+}
 
 const connectionString = process.env.DATABASE_URL;
 
@@ -14,7 +32,7 @@ describe.skipIf(!connectionString)("post lifecycle (integration)", () => {
 
   beforeAll(async () => {
     db = createDb(connectionString!);
-    core = createCoreServices(db);
+    core = createCoreServices(db, createInMemoryStorage());
     const [workspace] = await db
       .insert(workspaces)
       .values({ name: "core-integration-test" })
@@ -118,5 +136,28 @@ describe.skipIf(!connectionString)("post lifecycle (integration)", () => {
 
     const resolved = await core.comments.resolveComment({ commentId: root.id, resolved: true });
     expect(resolved.resolved).toBe(true);
+  });
+
+  it("attaches, lists, downloads, and deletes a file", async () => {
+    const post = await core.posts.createPost({ workspaceId, initialContent: "carousel post" });
+    const data = Buffer.from("%PDF-1.4 fake carousel bytes");
+
+    const attachment = await core.attachments.attachFile({
+      postId: post.id,
+      filename: "carousel.pdf",
+      mimeType: "application/pdf",
+      data,
+    });
+    expect(attachment.filename).toBe("carousel.pdf");
+    expect(attachment.sizeBytes).toBe(data.length);
+
+    const list = await core.attachments.listAttachments(post.id);
+    expect(list.map((a) => a.id)).toEqual([attachment.id]);
+
+    const downloaded = await core.attachments.downloadAttachment(attachment.id);
+    expect(downloaded.data.equals(data)).toBe(true);
+
+    await core.attachments.deleteAttachment(attachment.id);
+    expect(await core.attachments.listAttachments(post.id)).toHaveLength(0);
   });
 });

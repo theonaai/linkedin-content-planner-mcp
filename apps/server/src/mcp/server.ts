@@ -171,5 +171,37 @@ export function createMcpServer(core: CoreServices, workspaceId: string): McpSer
     (args) => safe(async () => ({ preview: toLinkedInPreview(args.contentMarkdown) }))(),
   );
 
+  server.registerTool(
+    "attach_file",
+    {
+      description:
+        "Attach a file (e.g. a PDF carousel or image) to a post. Pass the file bytes as base64.",
+      inputSchema: {
+        postId: z.string().uuid(),
+        filename: z.string(),
+        mimeType: z.string(),
+        contentBase64: z.string(),
+      },
+    },
+    (args) =>
+      safe(() =>
+        core.attachments.attachFile({
+          postId: args.postId,
+          filename: args.filename,
+          mimeType: args.mimeType,
+          data: Buffer.from(args.contentBase64, "base64"),
+        }),
+      )(),
+  );
+
+  server.registerTool(
+    "list_attachments",
+    {
+      description: "List attachments on a post (metadata only, not file bytes).",
+      inputSchema: { postId: z.string().uuid() },
+    },
+    (args) => safe(() => core.attachments.listAttachments(args.postId))(),
+  );
+
   return server;
 }

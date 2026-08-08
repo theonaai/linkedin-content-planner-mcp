@@ -7,14 +7,16 @@ import { LinkedInPreview } from "../components/LinkedInPreview.js";
 import { VersionsPanel } from "../components/VersionsPanel.js";
 import { CommentsPanel } from "../components/CommentsPanel.js";
 import { ReviewsPanel } from "../components/ReviewsPanel.js";
+import { AttachmentsPanel } from "../components/AttachmentsPanel.js";
 import type { Post, PostVersion } from "../lib/types.js";
 
-type Tab = "versions" | "comments" | "reviews";
+type Tab = "versions" | "comments" | "reviews" | "attachments";
 
 const TABS: { id: Tab; label: string }[] = [
   { id: "versions", label: "Versions" },
   { id: "comments", label: "Comments" },
   { id: "reviews", label: "Reviews" },
+  { id: "attachments", label: "Attachments" },
 ];
 
 export function PostDetailView() {
@@ -203,6 +205,7 @@ export function PostDetailView() {
           <CommentsPanel postVersionId={selectedVersion.id} content={selectedVersion.contentMarkdown} />
         )}
         {tab === "reviews" && <ReviewsPanel postId={post.id} postState={post.state} onReviewed={load} />}
+        {tab === "attachments" && <AttachmentsPanel postId={post.id} />}
       </div>
     </div>
   );

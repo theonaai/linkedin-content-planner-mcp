@@ -11,6 +11,7 @@
     "test": "vitest run --passWithNoTests"
   },
   "dependencies": {
+    "@fastify/multipart": "^9.0.1",
     "@linkedin-planner/core": "workspace:*",
     "@linkedin-planner/db": "workspace:*",
     "@linkedin-planner/formatting": "workspace:*",
