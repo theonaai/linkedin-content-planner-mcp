@@ -2,8 +2,7 @@ import { useState } from "react";
 import { Link } from "react-router-dom";
 import { api } from "../lib/api.js";
 import { usePostsWithSnippets, type PostWithSnippet } from "../lib/usePostsWithSnippets.js";
-import { NEXT_STATES, STATE_LABELS } from "../lib/stateMachine.js";
-import { StateBadge } from "../components/StateBadge.js";
+import { NEXT_STATES, STATE_BORDER_CLASSES, STATE_LABELS } from "../lib/stateMachine.js";
 import type { PostState } from "../lib/types.js";
 
 // Active-pipeline states get the kanban board; backlog and posted can accumulate a lot of
@@ -76,16 +75,16 @@ export function BacklogView() {
                 </h2>
                 <div className="flex flex-col gap-2">
                   {statePosts.map((post) => (
-                    <div key={post.id} className="rounded-md border border-gray-200 p-2">
+                    <div
+                      key={post.id}
+                      className={`rounded-md border border-l-4 border-gray-200 p-2 ${STATE_BORDER_CLASSES[state]}`}
+                    >
                       <Link to={`/posts/${post.id}`} className="block text-sm text-gray-900 hover:underline">
                         {post.snippet || <span className="italic text-gray-400">(empty)</span>}
                       </Link>
-                      <div className="mt-1 flex items-center justify-between">
-                        <StateBadge state={post.state} />
-                        {post.scheduledDate && (
-                          <span className="text-xs text-gray-500">{post.scheduledDate}</span>
-                        )}
-                      </div>
+                      {post.scheduledDate && (
+                        <div className="mt-1 text-xs text-gray-500">{post.scheduledDate}</div>
+                      )}
                       {NEXT_STATES[state].length > 0 && (
                         <div className="mt-2 flex flex-wrap gap-1">
                           {NEXT_STATES[state].map((next) => (

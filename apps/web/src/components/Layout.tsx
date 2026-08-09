@@ -13,10 +13,7 @@ export function Layout() {
           <span className="text-sm font-semibold text-gray-900">LinkedIn Content Planner</span>
           <nav className="flex gap-1">
             <NavLink to="/" end className={linkClass}>
-              Backlog
-            </NavLink>
-            <NavLink to="/calendar" className={linkClass}>
-              Calendar
+              Dashboard
             </NavLink>
           </nav>
         </div>

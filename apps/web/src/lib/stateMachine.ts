@@ -29,3 +29,12 @@ export const STATE_BADGE_CLASSES: Record<PostState, string> = {
   ready: "bg-emerald-100 text-emerald-800",
   posted: "bg-slate-800 text-white",
 };
+
+export const STATE_BORDER_CLASSES: Record<PostState, string> = {
+  backlog: "border-l-gray-300",
+  todo: "border-l-sky-400",
+  in_progress: "border-l-amber-400",
+  in_review: "border-l-purple-400",
+  ready: "border-l-emerald-400",
+  posted: "border-l-slate-700",
+};
