@@ -2,6 +2,7 @@ import { BrowserRouter, Route, Routes } from "react-router-dom";
 import { Layout } from "./components/Layout.js";
 import { DashboardView } from "./views/DashboardView.js";
 import { PostDetailView } from "./views/PostDetailView.js";
+import { WebhooksView } from "./views/WebhooksView.js";
 
 export function App() {
   return (
@@ -10,6 +11,7 @@ export function App() {
         <Route element={<Layout />}>
           <Route index element={<DashboardView />} />
           <Route path="posts/:id" element={<PostDetailView />} />
+          <Route path="webhooks" element={<WebhooksView />} />
         </Route>
       </Routes>
     </BrowserRouter>

@@ -15,6 +15,9 @@ export function Layout() {
             <NavLink to="/" end className={linkClass}>
               Dashboard
             </NavLink>
+            <NavLink to="/webhooks" className={linkClass}>
+              Webhooks
+            </NavLink>
           </nav>
         </div>
       </header>

@@ -52,3 +52,41 @@ export interface DiffOp {
   type: "add" | "remove" | "context";
   value: string;
 }
+
+export type WebhookEvent =
+  | "post.created"
+  | "post.state_changed"
+  | "post.review_changes_requested"
+  | "post.review_approved"
+  | "post.comment_added"
+  | "post.deleted";
+
+export const WEBHOOK_EVENTS: WebhookEvent[] = [
+  "post.created",
+  "post.state_changed",
+  "post.review_changes_requested",
+  "post.review_approved",
+  "post.comment_added",
+  "post.deleted",
+];
+
+export interface Webhook {
+  id: string;
+  workspaceId: string;
+  url: string;
+  events: WebhookEvent[];
+  secret: string | null;
+  active: boolean;
+  createdAt: string;
+}
+
+export interface WebhookDelivery {
+  id: string;
+  webhookId: string;
+  event: WebhookEvent;
+  payload: unknown;
+  success: boolean;
+  responseStatus: number | null;
+  error: string | null;
+  createdAt: string;
+}

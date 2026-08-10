@@ -8,6 +8,7 @@ import {
   integer,
   date,
   timestamp,
+  jsonb,
 } from "drizzle-orm/pg-core";
 
 export const platformEnum = pgEnum("platform", ["linkedin", "substack"]);
@@ -24,6 +25,15 @@ export const postStateEnum = pgEnum("post_state", [
 export const reviewDecisionEnum = pgEnum("review_decision", [
   "approved",
   "changes_requested",
+]);
+
+export const webhookEventEnum = pgEnum("webhook_event", [
+  "post.created",
+  "post.state_changed",
+  "post.review_changes_requested",
+  "post.review_approved",
+  "post.comment_added",
+  "post.deleted",
 ]);
 
 export const workspaces = pgTable("workspaces", {
@@ -109,5 +119,30 @@ export const stateEvents = pgTable("state_events", {
   fromState: postStateEnum("from_state"),
   toState: postStateEnum("to_state").notNull(),
   actorId: uuid("actor_id"),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+export const webhooks = pgTable("webhooks", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  workspaceId: uuid("workspace_id")
+    .notNull()
+    .references(() => workspaces.id, { onDelete: "cascade" }),
+  url: text("url").notNull(),
+  events: webhookEventEnum("events").array().notNull(),
+  secret: text("secret"),
+  active: boolean("active").notNull().default(true),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+export const webhookDeliveries = pgTable("webhook_deliveries", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  webhookId: uuid("webhook_id")
+    .notNull()
+    .references(() => webhooks.id, { onDelete: "cascade" }),
+  event: webhookEventEnum("event").notNull(),
+  payload: jsonb("payload").notNull(),
+  success: boolean("success").notNull(),
+  responseStatus: integer("response_status"),
+  error: text("error"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });

@@ -11,6 +11,7 @@ import { registerVersionRoutes } from "./routes/versions.js";
 import { registerReviewRoutes } from "./routes/reviews.js";
 import { registerCommentRoutes } from "./routes/comments.js";
 import { registerAttachmentRoutes } from "./routes/attachments.js";
+import { registerWebhookRoutes } from "./routes/webhooks.js";
 import { registerMcpRoutes } from "./mcp/route.js";
 
 const env = loadEnv();
@@ -30,6 +31,7 @@ registerVersionRoutes(app, core);
 registerReviewRoutes(app, core);
 registerCommentRoutes(app, core);
 registerAttachmentRoutes(app, core);
+registerWebhookRoutes(app, core, workspaceId);
 registerMcpRoutes(app, core, workspaceId);
 
 await app.listen({ port: env.port, host: "0.0.0.0" });

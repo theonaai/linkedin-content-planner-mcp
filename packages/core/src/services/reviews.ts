@@ -5,12 +5,13 @@ import { assertReviewTransition } from "../stateMachine.js";
 import type { ReviewDecision } from "../types.js";
 import type { PostService } from "./posts.js";
 import type { VersionService } from "./versions.js";
+import type { WebhookService } from "./webhooks.js";
 
 export function createReviewService(
   db: Db,
-  deps: { postService: PostService; versionService: VersionService },
+  deps: { postService: PostService; versionService: VersionService; webhookService: WebhookService },
 ) {
-  const { postService, versionService } = deps;
+  const { postService, versionService, webhookService } = deps;
 
   return {
     async submitReview(params: {
@@ -48,6 +49,18 @@ export function createReviewService(
         toState: nextState,
         actorId: params.reviewerId ?? null,
       });
+
+      void webhookService.dispatch(
+        post.workspaceId,
+        params.decision === "approved" ? "post.review_approved" : "post.review_changes_requested",
+        {
+          postId: params.postId,
+          workspaceId: post.workspaceId,
+          reviewId: review.id,
+          decision: params.decision,
+          body: review.body,
+        },
+      );
 
       return review;
     },

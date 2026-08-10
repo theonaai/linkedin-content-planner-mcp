@@ -1,10 +1,21 @@
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
+import { createServer, type Server } from "node:http";
 import { createDb, workspaces, type Db } from "@linkedin-planner/db";
 import { eq } from "drizzle-orm";
 import { createCoreServices, type CoreServices } from "../context.js";
 import { NotFoundError, ValidationError } from "../errors.js";
 import { InvalidStateTransitionError } from "../stateMachine.js";
 import type { StorageAdapter } from "../storage.js";
+
+async function waitFor<T>(check: () => Promise<T | undefined>, timeoutMs = 3000): Promise<T> {
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    const result = await check();
+    if (result !== undefined) return result;
+    await new Promise((resolve) => setTimeout(resolve, 50));
+  }
+  throw new Error("waitFor: timed out");
+}
 
 function createInMemoryStorage(): StorageAdapter {
   const files = new Map<string, Buffer>();
@@ -315,5 +326,144 @@ describe.skipIf(!connectionString)("post lifecycle (integration)", () => {
     await expect(core.posts.deletePost("00000000-0000-0000-0000-000000000000")).rejects.toThrow(
       NotFoundError,
     );
+  });
+
+  it("creates, updates, and deletes a webhook", async () => {
+    const webhook = await core.webhooks.createWebhook({
+      workspaceId,
+      url: "https://example.com/hooks/planner",
+      events: ["post.created", "post.deleted"],
+      secret: "shh",
+    });
+    expect(webhook.active).toBe(true);
+    expect(await core.webhooks.listWebhooks(workspaceId)).toEqual(
+      expect.arrayContaining([expect.objectContaining({ id: webhook.id })]),
+    );
+
+    const paused = await core.webhooks.updateWebhook({ webhookId: webhook.id, active: false });
+    expect(paused.active).toBe(false);
+
+    await core.webhooks.deleteWebhook(webhook.id);
+    await expect(core.webhooks.getWebhook(webhook.id)).rejects.toThrow(NotFoundError);
+  });
+
+  describe("webhook dispatch", () => {
+    let server: Server;
+    let baseUrl: string;
+    let received: { event: string; payload: unknown; signature: string | undefined }[];
+
+    beforeAll(async () => {
+      received = [];
+      server = createServer((req, res) => {
+        const chunks: Buffer[] = [];
+        req.on("data", (c) => chunks.push(c));
+        req.on("end", () => {
+          const body = JSON.parse(Buffer.concat(chunks).toString("utf8"));
+          received.push({
+            event: body.event,
+            payload: body.payload,
+            signature: req.headers["x-webhook-signature"] as string | undefined,
+          });
+          res.writeHead(200).end("ok");
+        });
+      });
+      await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+      const address = server.address();
+      if (!address || typeof address === "string") throw new Error("expected a bound TCP address");
+      baseUrl = `http://127.0.0.1:${address.port}`;
+    });
+
+    afterAll(async () => {
+      await new Promise<void>((resolve) => server.close(() => resolve()));
+    });
+
+    it("delivers a subscribed event, signed with the webhook's secret, and logs the delivery", async () => {
+      received.length = 0;
+      const secret = "top-secret";
+      const webhook = await core.webhooks.createWebhook({
+        workspaceId,
+        url: baseUrl,
+        events: ["post.created"],
+        secret,
+      });
+
+      const post = await core.posts.createPost({ workspaceId, initialContent: "webhook test post" });
+
+      const delivery = await waitFor(async () => {
+        const rows = await core.webhooks.listDeliveries(webhook.id);
+        return rows.find((r) => r.event === "post.created");
+      });
+      expect(delivery.success).toBe(true);
+      expect(delivery.responseStatus).toBe(200);
+      expect((delivery.payload as { postId: string }).postId).toBe(post.id);
+
+      const hit = received.find((r) => r.event === "post.created");
+      expect(hit).toBeDefined();
+      expect((hit!.payload as { postId: string }).postId).toBe(post.id);
+      // The signature covers the exact (timestamp-dependent) request body, so just assert
+      // it's present and shaped like our sha256 hex-digest scheme.
+      expect(hit!.signature).toMatch(/^sha256=[0-9a-f]{64}$/);
+
+      await core.webhooks.deleteWebhook(webhook.id);
+    });
+
+    it("does not deliver events the webhook isn't subscribed to", async () => {
+      received.length = 0;
+      const webhook = await core.webhooks.createWebhook({
+        workspaceId,
+        url: baseUrl,
+        events: ["post.deleted"],
+      });
+
+      const post = await core.posts.createPost({ workspaceId, initialContent: "unsubscribed event test" });
+      // No post.created delivery should ever show up for this webhook — give the (absent)
+      // async dispatch a moment to have fired before asserting its absence.
+      await new Promise((resolve) => setTimeout(resolve, 200));
+      expect(await core.webhooks.listDeliveries(webhook.id)).toHaveLength(0);
+
+      await core.posts.deletePost(post.id);
+      const delivery = await waitFor(async () => {
+        const rows = await core.webhooks.listDeliveries(webhook.id);
+        return rows.find((r) => r.event === "post.deleted");
+      });
+      expect(delivery.success).toBe(true);
+
+      await core.webhooks.deleteWebhook(webhook.id);
+    });
+
+    it("does not deliver to a paused webhook", async () => {
+      received.length = 0;
+      const webhook = await core.webhooks.createWebhook({
+        workspaceId,
+        url: baseUrl,
+        events: ["post.created"],
+      });
+      await core.webhooks.updateWebhook({ webhookId: webhook.id, active: false });
+
+      await core.posts.createPost({ workspaceId, initialContent: "paused webhook test" });
+      await new Promise((resolve) => setTimeout(resolve, 200));
+      expect(await core.webhooks.listDeliveries(webhook.id)).toHaveLength(0);
+
+      await core.webhooks.deleteWebhook(webhook.id);
+    });
+
+    it("logs a failed delivery when the receiver is unreachable, without throwing", async () => {
+      const webhook = await core.webhooks.createWebhook({
+        workspaceId,
+        url: "http://127.0.0.1:1",
+        events: ["post.created"],
+      });
+
+      await core.posts.createPost({ workspaceId, initialContent: "unreachable webhook test" });
+
+      const delivery = await waitFor(async () => {
+        const rows = await core.webhooks.listDeliveries(webhook.id);
+        return rows.find((r) => r.event === "post.created");
+      }, 8000);
+      expect(delivery.success).toBe(false);
+      expect(delivery.error).toBeTruthy();
+
+      await core.webhooks.deleteWebhook(webhook.id);
+    });
   });
 });

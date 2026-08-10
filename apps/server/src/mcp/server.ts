@@ -9,6 +9,8 @@ import {
   postStateSchema,
   reviewDecisionSchema,
   strReplaceContentInputSchema,
+  createWebhookInputSchema,
+  updateWebhookInputSchema,
 } from "@linkedin-planner/core";
 import { toLinkedInPreview, MARKDOWN_SUBSET_DESCRIPTION } from "@linkedin-planner/formatting";
 
@@ -234,6 +236,63 @@ export function createMcpServer(core: CoreServices, workspaceId: string): McpSer
       inputSchema: { postId: z.string().uuid() },
     },
     (args) => safe(() => core.attachments.listAttachments(args.postId))(),
+  );
+
+  server.registerTool(
+    "create_webhook",
+    {
+      description:
+        "Register a webhook that gets a POST request whenever a chosen event happens (post.created, " +
+        "post.state_changed, post.review_changes_requested, post.review_approved, post.comment_added, " +
+        "post.deleted). Pass a secret to have deliveries signed with an X-Webhook-Signature header " +
+        "(sha256=<hmac>) so the receiver can verify authenticity.",
+      inputSchema: createWebhookInputSchema.shape,
+    },
+    (args) => safe(() => core.webhooks.createWebhook({ workspaceId, ...args }))(),
+  );
+
+  server.registerTool(
+    "list_webhooks",
+    {
+      description: "List all registered webhooks.",
+      inputSchema: {},
+    },
+    () => safe(() => core.webhooks.listWebhooks(workspaceId))(),
+  );
+
+  server.registerTool(
+    "update_webhook",
+    {
+      description:
+        "Update a webhook's URL, subscribed events, secret, or active flag. Set active=false to " +
+        "pause deliveries without deleting the subscription.",
+      inputSchema: { webhookId: z.string().uuid(), ...updateWebhookInputSchema.shape },
+    },
+    (args) => safe(() => core.webhooks.updateWebhook(args))(),
+  );
+
+  server.registerTool(
+    "delete_webhook",
+    {
+      description: "Permanently delete a webhook subscription and its delivery history.",
+      inputSchema: { webhookId: z.string().uuid() },
+      annotations: { destructiveHint: true, idempotentHint: false },
+    },
+    (args) =>
+      safe(async () => {
+        await core.webhooks.deleteWebhook(args.webhookId);
+        return { deleted: true, webhookId: args.webhookId };
+      })(),
+  );
+
+  server.registerTool(
+    "list_webhook_deliveries",
+    {
+      description:
+        "List delivery attempts for a webhook (success/failure, response status, error), newest first — useful for debugging why an agent didn't get triggered.",
+      inputSchema: { webhookId: z.string().uuid() },
+    },
+    (args) => safe(() => core.webhooks.listDeliveries(args.webhookId))(),
   );
 
   return server;

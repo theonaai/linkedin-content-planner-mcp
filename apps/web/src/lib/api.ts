@@ -1,4 +1,16 @@
-import type { Comment, DiffOp, Platform, Post, PostState, PostVersion, Review, ReviewDecision } from "./types.js";
+import type {
+  Comment,
+  DiffOp,
+  Platform,
+  Post,
+  PostState,
+  PostVersion,
+  Review,
+  ReviewDecision,
+  Webhook,
+  WebhookDelivery,
+  WebhookEvent,
+} from "./types.js";
 
 const BASE = "/api";
 
@@ -61,4 +73,14 @@ export const api = {
   ) => request<Comment>(`/versions/${versionId}/comments`, { method: "POST", body: JSON.stringify(input) }),
   resolveComment: (id: string, resolved: boolean) =>
     request<Comment>(`/comments/${id}/resolve`, { method: "PATCH", body: JSON.stringify({ resolved }) }),
+
+  listWebhooks: () => request<Webhook[]>("/webhooks"),
+  createWebhook: (input: { url: string; events: WebhookEvent[]; secret?: string }) =>
+    request<Webhook>("/webhooks", { method: "POST", body: JSON.stringify(input) }),
+  updateWebhook: (
+    id: string,
+    input: Partial<{ url: string; events: WebhookEvent[]; secret: string | null; active: boolean }>,
+  ) => request<Webhook>(`/webhooks/${id}`, { method: "PATCH", body: JSON.stringify(input) }),
+  deleteWebhook: (id: string) => request<void>(`/webhooks/${id}`, { method: "DELETE" }),
+  listWebhookDeliveries: (id: string) => request<WebhookDelivery[]>(`/webhooks/${id}/deliveries`),
 };

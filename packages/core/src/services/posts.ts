@@ -4,9 +4,13 @@ import { assertTransition } from "../stateMachine.js";
 import { NotFoundError, ValidationError } from "../errors.js";
 import type { PostState, Platform } from "../types.js";
 import type { AttachmentService } from "./attachments.js";
+import type { WebhookService } from "./webhooks.js";
 
-export function createPostService(db: Db, deps: { attachmentService: AttachmentService }) {
-  const { attachmentService } = deps;
+export function createPostService(
+  db: Db,
+  deps: { attachmentService: AttachmentService; webhookService: WebhookService },
+) {
+  const { attachmentService, webhookService } = deps;
   async function getPost(postId: string) {
     const [post] = await db.select().from(posts).where(eq(posts.id, postId)).limit(1);
     if (!post) throw new NotFoundError("Post", postId);
@@ -77,6 +81,13 @@ export function createPostService(db: Db, deps: { attachmentService: AttachmentS
         actorId: params.authorId ?? null,
       });
 
+      void webhookService.dispatch(params.workspaceId, "post.created", {
+        postId: post.id,
+        workspaceId: post.workspaceId,
+        platform: post.platform,
+        state: post.state,
+      });
+
       return post;
     },
 
@@ -120,6 +131,13 @@ export function createPostService(db: Db, deps: { attachmentService: AttachmentS
         actorId: params.actorId ?? null,
       });
 
+      void webhookService.dispatch(post.workspaceId, "post.state_changed", {
+        postId: params.postId,
+        workspaceId: post.workspaceId,
+        fromState: post.state,
+        toState: params.toState,
+      });
+
       return updated;
     },
 
@@ -138,12 +156,17 @@ export function createPostService(db: Db, deps: { attachmentService: AttachmentS
      * DB), so those are deleted explicitly first via the attachment service, which already
      * knows how to remove both the file and its row together. */
     async deletePost(postId: string) {
-      await getPost(postId);
+      const post = await getPost(postId);
       const existingAttachments = await attachmentService.listAttachments(postId);
       for (const attachment of existingAttachments) {
         await attachmentService.deleteAttachment(attachment.id);
       }
       await db.delete(posts).where(eq(posts.id, postId));
+
+      void webhookService.dispatch(post.workspaceId, "post.deleted", {
+        postId,
+        workspaceId: post.workspaceId,
+      });
     },
   };
 }

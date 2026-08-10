@@ -54,3 +54,25 @@ export const addCommentInputSchema = z.object({
 });
 
 export const resolveCommentInputSchema = z.object({ resolved: z.boolean() });
+
+export const webhookEventSchema = z.enum([
+  "post.created",
+  "post.state_changed",
+  "post.review_changes_requested",
+  "post.review_approved",
+  "post.comment_added",
+  "post.deleted",
+]);
+
+export const createWebhookInputSchema = z.object({
+  url: z.string().url(),
+  events: z.array(webhookEventSchema).min(1),
+  secret: z.string().min(1).optional(),
+});
+
+export const updateWebhookInputSchema = z.object({
+  url: z.string().url().optional(),
+  events: z.array(webhookEventSchema).min(1).optional(),
+  secret: z.string().min(1).nullable().optional(),
+  active: z.boolean().optional(),
+});

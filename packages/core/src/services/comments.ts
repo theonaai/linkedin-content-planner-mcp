@@ -4,6 +4,8 @@ import { toLinkedInPreview } from "@linkedin-planner/formatting";
 import { NotFoundError } from "../errors.js";
 import { remapAnchor } from "../anchorRemap.js";
 import type { VersionService } from "./versions.js";
+import type { PostService } from "./posts.js";
+import type { WebhookService } from "./webhooks.js";
 
 export interface ResolvedComment {
   id: string;
@@ -25,8 +27,11 @@ export interface ResolvedComment {
   anchorStale: boolean;
 }
 
-export function createCommentService(db: Db, deps: { versionService: VersionService }) {
-  const { versionService } = deps;
+export function createCommentService(
+  db: Db,
+  deps: { versionService: VersionService; postService: PostService; webhookService: WebhookService },
+) {
+  const { versionService, postService, webhookService } = deps;
 
   return {
     async addComment(params: {
@@ -48,6 +53,17 @@ export function createCommentService(db: Db, deps: { versionService: VersionServ
           authorId: params.authorId ?? null,
         })
         .returning();
+
+      const version = await versionService.getVersion(params.postVersionId);
+      const post = await postService.getPost(version.postId);
+      void webhookService.dispatch(post.workspaceId, "post.comment_added", {
+        postId: post.id,
+        workspaceId: post.workspaceId,
+        commentId: comment.id,
+        postVersionId: params.postVersionId,
+        body: comment.body,
+      });
+
       return comment;
     },
 

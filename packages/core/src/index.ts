@@ -11,4 +11,5 @@ export * from "./services/versions.js";
 export * from "./services/comments.js";
 export * from "./services/reviews.js";
 export * from "./services/attachments.js";
+export * from "./services/webhooks.js";
 
