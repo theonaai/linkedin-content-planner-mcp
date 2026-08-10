@@ -15,6 +15,20 @@
       "when": 1786362261741,
       "tag": "0001_lyrical_zaran",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1786390187088,
+      "tag": "0002_lush_cardiac",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1786393895384,
+      "tag": "0003_fancy_lily_hollister",
+      "breakpoints": true
     }
   ]
 }

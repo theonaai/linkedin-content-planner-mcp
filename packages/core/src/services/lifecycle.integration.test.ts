@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { createServer, type Server } from "node:http";
-import { createDb, workspaces, type Db } from "@linkedin-planner/db";
+import { randomUUID } from "node:crypto";
+import { createDb, workspaces, users, memberships, type Db } from "@linkedin-planner/db";
 import { eq } from "drizzle-orm";
 import { createCoreServices, type CoreServices } from "../context.js";
 import { NotFoundError, ValidationError } from "../errors.js";
@@ -486,6 +487,105 @@ describe.skipIf(!connectionString)("post lifecycle (integration)", () => {
       }, 8000);
       expect(delivery.success).toBe(false);
       expect(delivery.error).toBeTruthy();
+
+      await core.webhooks.deleteWebhook(webhook.id);
+    });
+  });
+
+  describe("user provisioning", () => {
+    async function cleanup(userId: string, workspaceId: string) {
+      await db.delete(memberships).where(eq(memberships.userId, userId));
+      await db.delete(workspaces).where(eq(workspaces.id, workspaceId));
+      await db.delete(users).where(eq(users.id, userId));
+    }
+
+    it("provisions a personal workspace on first login and reuses it on repeat logins", async () => {
+      const theonaUserId = `theona-test-${randomUUID()}`;
+      const user1 = await core.users.findOrCreateUser({ theonaUserId, email: "ghostwriter@example.com" });
+      expect(user1.theonaUserId).toBe(theonaUserId);
+
+      const memberships1 = await core.users.listMemberships(user1.id);
+      expect(memberships1).toHaveLength(1);
+      expect(memberships1[0].role).toBe("owner");
+
+      // Logging in again must not create a second user or a second workspace.
+      const user2 = await core.users.findOrCreateUser({ theonaUserId, email: "ghostwriter@example.com" });
+      expect(user2.id).toBe(user1.id);
+      const memberships2 = await core.users.listMemberships(user1.id);
+      expect(memberships2).toHaveLength(1);
+      expect(memberships2[0].workspaceId).toBe(memberships1[0].workspaceId);
+
+      await core.users.assertMembership(user1.id, memberships1[0].workspaceId);
+      await expect(
+        core.users.assertMembership(user1.id, "00000000-0000-0000-0000-000000000000"),
+      ).rejects.toThrow(NotFoundError);
+
+      await cleanup(user1.id, memberships1[0].workspaceId);
+    });
+
+    it("keeps the cached email in sync when it changes upstream", async () => {
+      const theonaUserId = `theona-test-${randomUUID()}`;
+      const created = await core.users.findOrCreateUser({ theonaUserId, email: "old@example.com" });
+      const updated = await core.users.findOrCreateUser({ theonaUserId, email: "new@example.com" });
+      expect(updated.id).toBe(created.id);
+      expect(updated.email).toBe("new@example.com");
+
+      const membershipRows = await core.users.listMemberships(created.id);
+      await cleanup(created.id, membershipRows[0].workspaceId);
+    });
+  });
+
+  describe("authz workspace resolvers", () => {
+    it("resolves the owning workspace for a post, version, comment, and attachment", async () => {
+      const post = await core.posts.createPost({ workspaceId, initialContent: "authz test post" });
+      const version = await core.versions.getLatestVersion(post.id);
+      const comment = await core.comments.addComment({ postVersionId: version.id, body: "authz test comment" });
+      const attachment = await core.attachments.attachFile({
+        postId: post.id,
+        filename: "authz-test.txt",
+        mimeType: "text/plain",
+        data: Buffer.from("x"),
+      });
+
+      expect(await core.authz.resolvePostWorkspace(post.id)).toBe(workspaceId);
+      expect(await core.authz.resolveVersionWorkspace(version.id)).toBe(workspaceId);
+      expect(await core.authz.resolveCommentWorkspace(comment.id)).toBe(workspaceId);
+      expect(await core.authz.resolveAttachmentWorkspace(attachment.id)).toBe(workspaceId);
+
+      await core.attachments.deleteAttachment(attachment.id);
+      await core.posts.deletePost(post.id);
+    });
+
+    it("resolves a review's owning workspace", async () => {
+      const post = await core.posts.createPost({ workspaceId, initialContent: "authz review test" });
+      await core.posts.setPostState({ postId: post.id, toState: "todo" });
+      await core.posts.setPostState({ postId: post.id, toState: "in_progress" });
+      await core.posts.setPostState({ postId: post.id, toState: "in_review" });
+      const review = await core.reviews.submitReview({ postId: post.id, decision: "approved" });
+
+      expect(await core.authz.resolveReviewWorkspace(review.id)).toBe(workspaceId);
+
+      await core.posts.deletePost(post.id);
+    });
+
+    it("throws NotFoundError for every resolver when given a nonexistent id", async () => {
+      const bogusId = "00000000-0000-0000-0000-000000000000";
+      await expect(core.authz.resolvePostWorkspace(bogusId)).rejects.toThrow(NotFoundError);
+      await expect(core.authz.resolveVersionWorkspace(bogusId)).rejects.toThrow(NotFoundError);
+      await expect(core.authz.resolveCommentWorkspace(bogusId)).rejects.toThrow(NotFoundError);
+      await expect(core.authz.resolveReviewWorkspace(bogusId)).rejects.toThrow(NotFoundError);
+      await expect(core.authz.resolveAttachmentWorkspace(bogusId)).rejects.toThrow(NotFoundError);
+      await expect(core.authz.resolveWebhookWorkspace(bogusId)).rejects.toThrow(NotFoundError);
+    });
+
+    it("resolves a webhook's owning workspace", async () => {
+      const webhook = await core.webhooks.createWebhook({
+        workspaceId,
+        url: "https://example.com/hook",
+        events: ["post.created"],
+      });
+
+      expect(await core.authz.resolveWebhookWorkspace(webhook.id)).toBe(workspaceId);
 
       await core.webhooks.deleteWebhook(webhook.id);
     });

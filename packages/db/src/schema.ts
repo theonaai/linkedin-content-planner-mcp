@@ -9,6 +9,7 @@ import {
   date,
   timestamp,
   jsonb,
+  unique,
 } from "drizzle-orm/pg-core";
 
 export const platformEnum = pgEnum("platform", ["linkedin", "substack"]);
@@ -36,21 +37,37 @@ export const webhookEventEnum = pgEnum("webhook_event", [
   "post.deleted",
 ]);
 
+// Identity is federated from Theona's own OAuth AS (see docs on the auth plan) — this table
+// is a thin mirror keyed by that token's `sub`, never a credential store. No passwords, no
+// duplicated auth state; it exists purely so workspace membership has something to point at.
+export const users = pgTable("users", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  theonaUserId: text("theona_user_id").notNull().unique(),
+  email: text("email").notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
 export const workspaces = pgTable("workspaces", {
   id: uuid("id").primaryKey().defaultRandom(),
   name: text("name").notNull(),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
-export const memberships = pgTable("memberships", {
-  id: uuid("id").primaryKey().defaultRandom(),
-  workspaceId: uuid("workspace_id")
-    .notNull()
-    .references(() => workspaces.id, { onDelete: "cascade" }),
-  userId: uuid("user_id").notNull(),
-  role: varchar("role", { length: 32 }).notNull().default("owner"),
-  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
-});
+export const memberships = pgTable(
+  "memberships",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    workspaceId: uuid("workspace_id")
+      .notNull()
+      .references(() => workspaces.id, { onDelete: "cascade" }),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    role: varchar("role", { length: 32 }).notNull().default("owner"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [unique().on(table.workspaceId, table.userId)],
+);
 
 export const posts = pgTable("posts", {
   id: uuid("id").primaryKey().defaultRandom(),
@@ -145,4 +162,37 @@ export const webhookDeliveries = pgTable("webhook_deliveries", {
   responseStatus: integer("response_status"),
   error: text("error"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+// --- The planner's own OAuth 2.1 authorization server (mints tokens for AI agents calling
+// /mcp) — one table per `oidc-provider` model, mirroring aidl-002's own mcp_oauth_* schema.
+// Every row shares the same shape: `id` (the library's own opaque id, not a UUID we mint),
+// `payload` (the model's full JSON state — the library's source of truth), `grantId`/`uid`
+// (indexed lookup keys some models use), `expiresAt`/`consumedAt` (TTL + replay tracking).
+// See packages/db/../services/oauth/adapter.ts for how these are read/written.
+function oauthModelColumns() {
+  return {
+    id: text("id").primaryKey(),
+    payload: jsonb("payload").notNull(),
+    grantId: text("grant_id"),
+    uid: text("uid"),
+    expiresAt: timestamp("expires_at", { withTimezone: true }),
+    consumedAt: timestamp("consumed_at", { withTimezone: true }),
+  };
+}
+
+export const mcpOauthSession = pgTable("mcp_oauth_session", oauthModelColumns());
+export const mcpOauthAccessToken = pgTable("mcp_oauth_access_token", oauthModelColumns());
+export const mcpOauthAuthorizationCode = pgTable("mcp_oauth_authorization_code", oauthModelColumns());
+export const mcpOauthRefreshToken = pgTable("mcp_oauth_refresh_token", oauthModelColumns());
+export const mcpOauthClient = pgTable("mcp_oauth_client", oauthModelColumns());
+export const mcpOauthInteraction = pgTable("mcp_oauth_interaction", oauthModelColumns());
+
+// Grant carries one extra column beyond the generic shape: the workspace an MCP connection
+// was bound to at consent time (the user picks it on the consent screen when they belong to
+// more than one workspace). Every access token minted off this grant gets it stamped in as
+// the `workspace_id` claim — see services/oauth/grant-workspace.ts.
+export const mcpOauthGrant = pgTable("mcp_oauth_grant", {
+  ...oauthModelColumns(),
+  workspaceId: uuid("workspace_id").references(() => workspaces.id, { onDelete: "cascade" }),
 });

@@ -12,6 +12,7 @@ import {
   updateWebhookInputSchema,
   updateContentInputSchema,
   submitReviewInputSchema,
+  NotFoundError,
   MAX_CONTENT_LENGTH,
   MAX_FILENAME_LENGTH,
   MAX_MIME_TYPE_LENGTH,
@@ -40,6 +41,28 @@ function safe<T>(fn: () => Promise<T>) {
 export function createMcpServer(core: CoreServices, workspaceId: string): McpServer {
   const server = new McpServer({ name: "linkedin-content-planner", version: "0.0.0" });
 
+  // Every tool that operates on an existing resource by id must confirm that resource
+  // actually belongs to this connection's workspace before touching it — otherwise a valid
+  // token for workspace A could read/edit/delete workspace B's data just by guessing or
+  // being told an id. Throwing NotFoundError (not a distinct "forbidden") for a mismatch
+  // matches the REST layer's choice: a non-member can't tell a resource exists at all.
+  async function assertPostAccess(postId: string): Promise<void> {
+    const actual = await core.authz.resolvePostWorkspace(postId);
+    if (actual !== workspaceId) throw new NotFoundError("Post", postId);
+  }
+  async function assertVersionAccess(versionId: string): Promise<void> {
+    const actual = await core.authz.resolveVersionWorkspace(versionId);
+    if (actual !== workspaceId) throw new NotFoundError("PostVersion", versionId);
+  }
+  async function assertCommentAccess(commentId: string): Promise<void> {
+    const actual = await core.authz.resolveCommentWorkspace(commentId);
+    if (actual !== workspaceId) throw new NotFoundError("Comment", commentId);
+  }
+  async function assertWebhookAccess(webhookId: string): Promise<void> {
+    const actual = await core.authz.resolveWebhookWorkspace(webhookId);
+    if (actual !== workspaceId) throw new NotFoundError("Webhook", webhookId);
+  }
+
   server.registerTool(
     "create_post",
     {
@@ -65,7 +88,11 @@ export function createMcpServer(core: CoreServices, workspaceId: string): McpSer
       description: "Get a single post by id.",
       inputSchema: { postId: z.string().uuid() },
     },
-    (args) => safe(() => core.posts.getPost(args.postId))(),
+    (args) =>
+      safe(async () => {
+        await assertPostAccess(args.postId);
+        return core.posts.getPost(args.postId);
+      })(),
   );
 
   server.registerTool(
@@ -74,7 +101,11 @@ export function createMcpServer(core: CoreServices, workspaceId: string): McpSer
       description: `Create a new version of a post with updated content. ${MARKDOWN_SUBSET_DESCRIPTION}`,
       inputSchema: { postId: z.string().uuid(), ...updateContentInputSchema.shape },
     },
-    (args) => safe(() => core.versions.updatePostContent(args))(),
+    (args) =>
+      safe(async () => {
+        await assertPostAccess(args.postId);
+        return core.versions.updatePostContent(args);
+      })(),
   );
 
   server.registerTool(
@@ -85,7 +116,11 @@ export function createMcpServer(core: CoreServices, workspaceId: string): McpSer
         `Content follows the same rules as update_post_content: ${MARKDOWN_SUBSET_DESCRIPTION}`,
       inputSchema: { postId: z.string().uuid(), ...strReplaceContentInputSchema.shape },
     },
-    (args) => safe(() => core.versions.strReplaceContent(args))(),
+    (args) =>
+      safe(async () => {
+        await assertPostAccess(args.postId);
+        return core.versions.strReplaceContent(args);
+      })(),
   );
 
   server.registerTool(
@@ -94,7 +129,11 @@ export function createMcpServer(core: CoreServices, workspaceId: string): McpSer
       description: "List all versions of a post, oldest first.",
       inputSchema: { postId: z.string().uuid() },
     },
-    (args) => safe(() => core.versions.listVersions(args.postId))(),
+    (args) =>
+      safe(async () => {
+        await assertPostAccess(args.postId);
+        return core.versions.listVersions(args.postId);
+      })(),
   );
 
   server.registerTool(
@@ -103,7 +142,12 @@ export function createMcpServer(core: CoreServices, workspaceId: string): McpSer
       description: "Get a line-level diff between two versions of a post.",
       inputSchema: getVersionDiffInputSchema.shape,
     },
-    (args) => safe(() => core.versions.getVersionDiff(args))(),
+    (args) =>
+      safe(async () => {
+        await assertVersionAccess(args.versionIdA);
+        await assertVersionAccess(args.versionIdB);
+        return core.versions.getVersionDiff(args);
+      })(),
   );
 
   server.registerTool(
@@ -112,7 +156,11 @@ export function createMcpServer(core: CoreServices, workspaceId: string): McpSer
       description: "Create a new version copying an older version's content (history stays append-only).",
       inputSchema: { postId: z.string().uuid(), versionId: z.string().uuid() },
     },
-    (args) => safe(() => core.versions.revertToVersion(args))(),
+    (args) =>
+      safe(async () => {
+        await assertPostAccess(args.postId);
+        return core.versions.revertToVersion(args);
+      })(),
   );
 
   server.registerTool(
@@ -122,7 +170,11 @@ export function createMcpServer(core: CoreServices, workspaceId: string): McpSer
         "Move a post to a new state. The server enforces the legal-transition graph: backlog<->todo<->in_progress->in_review, ready->posted, ready->in_progress. Entering in_review is allowed here; leaving in_review (to ready or back to in_progress) only happens via submit_review.",
       inputSchema: { postId: z.string().uuid(), toState: postStateSchema },
     },
-    (args) => safe(() => core.posts.setPostState(args))(),
+    (args) =>
+      safe(async () => {
+        await assertPostAccess(args.postId);
+        return core.posts.setPostState(args);
+      })(),
   );
 
   server.registerTool(
@@ -131,7 +183,11 @@ export function createMcpServer(core: CoreServices, workspaceId: string): McpSer
       description: "Set (or clear, with null) a post's scheduled publish date.",
       inputSchema: { postId: z.string().uuid(), scheduledDate: z.string().nullable() },
     },
-    (args) => safe(() => core.posts.setPostDate(args))(),
+    (args) =>
+      safe(async () => {
+        await assertPostAccess(args.postId);
+        return core.posts.setPostDate(args);
+      })(),
   );
 
   server.registerTool(
@@ -144,6 +200,7 @@ export function createMcpServer(core: CoreServices, workspaceId: string): McpSer
     },
     (args) =>
       safe(async () => {
+        await assertPostAccess(args.postId);
         await core.posts.deletePost(args.postId);
         return { deleted: true, postId: args.postId };
       })(),
@@ -156,7 +213,11 @@ export function createMcpServer(core: CoreServices, workspaceId: string): McpSer
         "Approve or request changes on a post that is in_review. Approving moves it to ready; requesting changes moves it back to in_progress and requires a body explaining what to fix.",
       inputSchema: { postId: z.string().uuid(), ...submitReviewInputSchema.shape },
     },
-    (args) => safe(() => core.reviews.submitReview(args))(),
+    (args) =>
+      safe(async () => {
+        await assertPostAccess(args.postId);
+        return core.reviews.submitReview(args);
+      })(),
   );
 
   server.registerTool(
@@ -165,7 +226,11 @@ export function createMcpServer(core: CoreServices, workspaceId: string): McpSer
       description: "List the review history (approve/request-changes decisions) for a post.",
       inputSchema: { postId: z.string().uuid() },
     },
-    (args) => safe(() => core.reviews.listReviews(args.postId))(),
+    (args) =>
+      safe(async () => {
+        await assertPostAccess(args.postId);
+        return core.reviews.listReviews(args.postId);
+      })(),
   );
 
   server.registerTool(
@@ -174,7 +239,11 @@ export function createMcpServer(core: CoreServices, workspaceId: string): McpSer
       description: "Add a comment on a post version, optionally anchored to a text range and/or threaded as a reply.",
       inputSchema: { postVersionId: z.string().uuid(), ...addCommentInputSchema.shape },
     },
-    (args) => safe(() => core.comments.addComment(args))(),
+    (args) =>
+      safe(async () => {
+        await assertVersionAccess(args.postVersionId);
+        return core.comments.addComment(args);
+      })(),
   );
 
   server.registerTool(
@@ -186,7 +255,11 @@ export function createMcpServer(core: CoreServices, workspaceId: string): McpSer
         "anchorStale is true when the text a comment referred to was edited or removed since.",
       inputSchema: { postId: z.string().uuid() },
     },
-    (args) => safe(() => core.comments.listCommentsForLatestVersion(args.postId))(),
+    (args) =>
+      safe(async () => {
+        await assertPostAccess(args.postId);
+        return core.comments.listCommentsForLatestVersion(args.postId);
+      })(),
   );
 
   server.registerTool(
@@ -195,7 +268,11 @@ export function createMcpServer(core: CoreServices, workspaceId: string): McpSer
       description: "Mark a comment resolved or unresolved.",
       inputSchema: { commentId: z.string().uuid(), resolved: z.boolean() },
     },
-    (args) => safe(() => core.comments.resolveComment(args))(),
+    (args) =>
+      safe(async () => {
+        await assertCommentAccess(args.commentId);
+        return core.comments.resolveComment(args);
+      })(),
   );
 
   server.registerTool(
@@ -221,14 +298,15 @@ export function createMcpServer(core: CoreServices, workspaceId: string): McpSer
       },
     },
     (args) =>
-      safe(() =>
-        core.attachments.attachFile({
+      safe(async () => {
+        await assertPostAccess(args.postId);
+        return core.attachments.attachFile({
           postId: args.postId,
           filename: args.filename,
           mimeType: args.mimeType,
           data: Buffer.from(args.contentBase64, "base64"),
-        }),
-      )(),
+        });
+      })(),
   );
 
   server.registerTool(
@@ -237,7 +315,11 @@ export function createMcpServer(core: CoreServices, workspaceId: string): McpSer
       description: "List attachments on a post (metadata only, not file bytes).",
       inputSchema: { postId: z.string().uuid() },
     },
-    (args) => safe(() => core.attachments.listAttachments(args.postId))(),
+    (args) =>
+      safe(async () => {
+        await assertPostAccess(args.postId);
+        return core.attachments.listAttachments(args.postId);
+      })(),
   );
 
   server.registerTool(
@@ -270,7 +352,11 @@ export function createMcpServer(core: CoreServices, workspaceId: string): McpSer
         "pause deliveries without deleting the subscription.",
       inputSchema: { webhookId: z.string().uuid(), ...updateWebhookInputSchema.shape },
     },
-    (args) => safe(() => core.webhooks.updateWebhook(args))(),
+    (args) =>
+      safe(async () => {
+        await assertWebhookAccess(args.webhookId);
+        return core.webhooks.updateWebhook(args);
+      })(),
   );
 
   server.registerTool(
@@ -282,6 +368,7 @@ export function createMcpServer(core: CoreServices, workspaceId: string): McpSer
     },
     (args) =>
       safe(async () => {
+        await assertWebhookAccess(args.webhookId);
         await core.webhooks.deleteWebhook(args.webhookId);
         return { deleted: true, webhookId: args.webhookId };
       })(),
@@ -294,7 +381,11 @@ export function createMcpServer(core: CoreServices, workspaceId: string): McpSer
         "List delivery attempts for a webhook (success/failure, response status, error), newest first — useful for debugging why an agent didn't get triggered.",
       inputSchema: { webhookId: z.string().uuid() },
     },
-    (args) => safe(() => core.webhooks.listDeliveries(args.webhookId))(),
+    (args) =>
+      safe(async () => {
+        await assertWebhookAccess(args.webhookId);
+        return core.webhooks.listDeliveries(args.webhookId);
+      })(),
   );
 
   return server;

@@ -13,4 +13,6 @@ export * from "./services/comments.js";
 export * from "./services/reviews.js";
 export * from "./services/attachments.js";
 export * from "./services/webhooks.js";
+export * from "./services/users.js";
+export * from "./services/authz.js";
 

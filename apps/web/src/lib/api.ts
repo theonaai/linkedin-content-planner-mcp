@@ -11,14 +11,23 @@ import type {
   WebhookDelivery,
   WebhookEvent,
 } from "./types.js";
+import { getActiveWorkspaceId } from "./workspace.js";
 
 const BASE = "/api";
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   // Only set Content-Type when actually sending a body — Fastify's JSON parser rejects a
   // Content-Type: application/json request with an empty body (as a bodyless DELETE sends).
+  const headers: Record<string, string> = {};
+  if (init?.body !== undefined) headers["Content-Type"] = "application/json";
+  const workspaceId = getActiveWorkspaceId();
+  if (workspaceId) headers["x-workspace-id"] = workspaceId;
+
   const res = await fetch(`${BASE}${path}`, {
-    headers: init?.body !== undefined ? { "Content-Type": "application/json" } : undefined,
+    // Harmless when auth is disabled (no session cookie exists to send); required when it's
+    // enabled so the planner's session cookie actually reaches the server.
+    credentials: "include",
+    headers: Object.keys(headers).length > 0 ? headers : undefined,
     ...init,
   });
   if (!res.ok) {

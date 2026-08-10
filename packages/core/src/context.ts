@@ -5,6 +5,8 @@ import { createCommentService } from "./services/comments.js";
 import { createReviewService } from "./services/reviews.js";
 import { createAttachmentService } from "./services/attachments.js";
 import { createWebhookService } from "./services/webhooks.js";
+import { createUserService } from "./services/users.js";
+import { createAuthzService } from "./services/authz.js";
 import type { StorageAdapter } from "./storage.js";
 
 export function createCoreServices(db: Db, storage: StorageAdapter) {
@@ -18,8 +20,10 @@ export function createCoreServices(db: Db, storage: StorageAdapter) {
     versionService: versions,
     webhookService: webhooks,
   });
+  const users = createUserService(db);
+  const authz = createAuthzService(db);
 
-  return { posts, versions, comments, reviews, attachments, webhooks };
+  return { posts, versions, comments, reviews, attachments, webhooks, users, authz };
 }
 
 export type CoreServices = ReturnType<typeof createCoreServices>;
