@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { api } from "../lib/api.js";
+import { MAX_REVIEW_BODY_LENGTH } from "../lib/limits.js";
 import type { PostState, Review, ReviewDecision } from "../lib/types.js";
 
 export function ReviewsPanel({
@@ -60,6 +61,7 @@ export function ReviewsPanel({
             placeholder="Note (required if requesting changes)…"
             value={decisionBody}
             onChange={(e) => setDecisionBody(e.target.value)}
+            maxLength={MAX_REVIEW_BODY_LENGTH}
           />
           {error && <p className="mb-2 text-xs text-red-600">{error}</p>}
           <div className="flex gap-2">

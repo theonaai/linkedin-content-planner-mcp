@@ -1,4 +1,12 @@
 import { z } from "zod";
+import {
+  MAX_CONTENT_LENGTH,
+  MAX_STR_REPLACE_LENGTH,
+  MAX_COMMENT_BODY_LENGTH,
+  MAX_REVIEW_BODY_LENGTH,
+  MAX_WEBHOOK_URL_LENGTH,
+  MAX_WEBHOOK_SECRET_LENGTH,
+} from "./limits.js";
 
 export const platformSchema = z.enum(["linkedin", "substack"]);
 export const postStateSchema = z.enum([
@@ -13,7 +21,7 @@ export const reviewDecisionSchema = z.enum(["approved", "changes_requested"]);
 
 export const createPostInputSchema = z.object({
   platform: platformSchema.optional(),
-  initialContent: z.string().optional(),
+  initialContent: z.string().max(MAX_CONTENT_LENGTH).optional(),
 });
 
 export const listPostsInputSchema = z.object({
@@ -27,11 +35,13 @@ export const setPostStateInputSchema = z.object({ toState: postStateSchema });
 
 export const setPostDateInputSchema = z.object({ scheduledDate: z.string().nullable() });
 
-export const updateContentInputSchema = z.object({ contentMarkdown: z.string() });
+export const updateContentInputSchema = z.object({
+  contentMarkdown: z.string().max(MAX_CONTENT_LENGTH),
+});
 
 export const strReplaceContentInputSchema = z.object({
-  oldStr: z.string().min(1),
-  newStr: z.string(),
+  oldStr: z.string().min(1).max(MAX_STR_REPLACE_LENGTH),
+  newStr: z.string().max(MAX_STR_REPLACE_LENGTH),
 });
 
 export const revertToVersionInputSchema = z.object({ versionId: z.string().uuid() });
@@ -43,11 +53,11 @@ export const getVersionDiffInputSchema = z.object({
 
 export const submitReviewInputSchema = z.object({
   decision: reviewDecisionSchema,
-  body: z.string().optional(),
+  body: z.string().max(MAX_REVIEW_BODY_LENGTH).optional(),
 });
 
 export const addCommentInputSchema = z.object({
-  body: z.string().min(1),
+  body: z.string().min(1).max(MAX_COMMENT_BODY_LENGTH),
   anchorOffset: z.number().int().nonnegative().optional(),
   anchorLength: z.number().int().positive().optional(),
   parentCommentId: z.string().uuid().optional(),
@@ -65,14 +75,14 @@ export const webhookEventSchema = z.enum([
 ]);
 
 export const createWebhookInputSchema = z.object({
-  url: z.string().url(),
+  url: z.string().url().max(MAX_WEBHOOK_URL_LENGTH),
   events: z.array(webhookEventSchema).min(1),
-  secret: z.string().min(1).optional(),
+  secret: z.string().min(1).max(MAX_WEBHOOK_SECRET_LENGTH).optional(),
 });
 
 export const updateWebhookInputSchema = z.object({
-  url: z.string().url().optional(),
+  url: z.string().url().max(MAX_WEBHOOK_URL_LENGTH).optional(),
   events: z.array(webhookEventSchema).min(1).optional(),
-  secret: z.string().min(1).nullable().optional(),
+  secret: z.string().min(1).max(MAX_WEBHOOK_SECRET_LENGTH).nullable().optional(),
   active: z.boolean().optional(),
 });

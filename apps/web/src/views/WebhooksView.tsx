@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { api } from "../lib/api.js";
+import { MAX_WEBHOOK_URL_LENGTH, MAX_WEBHOOK_SECRET_LENGTH } from "../lib/limits.js";
 import { WEBHOOK_EVENTS, type Webhook, type WebhookDelivery, type WebhookEvent } from "../lib/types.js";
 
 const EVENT_LABELS: Record<WebhookEvent, string> = {
@@ -54,6 +55,7 @@ function NewWebhookForm({ onCreated }: { onCreated: () => void }) {
             className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
             value={url}
             onChange={(e) => setUrl(e.target.value)}
+            maxLength={MAX_WEBHOOK_URL_LENGTH}
           />
         </div>
         <div>
@@ -67,6 +69,7 @@ function NewWebhookForm({ onCreated }: { onCreated: () => void }) {
             className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
             value={secret}
             onChange={(e) => setSecret(e.target.value)}
+            maxLength={MAX_WEBHOOK_SECRET_LENGTH}
           />
         </div>
         <div>

@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { api } from "../lib/api.js";
+import { MAX_COMMENT_BODY_LENGTH } from "../lib/limits.js";
 import type { Comment } from "../lib/types.js";
 
 function CommentThread({
@@ -54,6 +55,7 @@ function CommentThread({
             placeholder="Reply…"
             value={replyText}
             onChange={(e) => setReplyText(e.target.value)}
+            maxLength={MAX_COMMENT_BODY_LENGTH}
           />
           <button
             onClick={() => {
@@ -127,6 +129,7 @@ export function CommentsPanel({
             placeholder="General comment (not tied to a specific selection)…"
             value={generalText}
             onChange={(e) => setGeneralText(e.target.value)}
+            maxLength={MAX_COMMENT_BODY_LENGTH}
           />
           <div className="mt-1 flex justify-end gap-1">
             <button

@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { attachmentsApi, formatBytes, type Attachment } from "../lib/attachments.js";
+import { MAX_ATTACHMENT_BYTES } from "../lib/limits.js";
 
 export function AttachmentsPanel({ postId }: { postId: string }) {
   const [attachments, setAttachments] = useState<Attachment[]>([]);
@@ -26,6 +27,11 @@ export function AttachmentsPanel({ postId }: { postId: string }) {
   async function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (!file) return;
+    if (file.size > MAX_ATTACHMENT_BYTES) {
+      setError(`${file.name} is ${formatBytes(file.size)} — attachments are capped at 25 MB.`);
+      if (fileInputRef.current) fileInputRef.current.value = "";
+      return;
+    }
     setUploading(true);
     setError(null);
     try {

@@ -1,6 +1,7 @@
 import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import { toLinkedInPreview } from "@linkedin-planner/formatting";
 import { api } from "../lib/api.js";
+import { MAX_COMMENT_BODY_LENGTH } from "../lib/limits.js";
 import type { Comment } from "../lib/types.js";
 import { CommentIcon, GlobeIcon, RepostIcon, SendIcon, ThumbsUpIcon, UserAvatarIcon } from "./icons.js";
 
@@ -303,6 +304,7 @@ export function LinkedInPreview({ content, commentable }: { content: string; com
                   placeholder="Add a comment…"
                   value={composerText}
                   onChange={(e) => setComposerText(e.target.value)}
+                  maxLength={MAX_COMMENT_BODY_LENGTH}
                 />
                 <div className="mt-1 flex justify-end gap-1">
                   <button
@@ -353,6 +355,7 @@ export function LinkedInPreview({ content, commentable }: { content: string; com
                     placeholder="Reply…"
                     value={replyText}
                     onChange={(e) => setReplyText(e.target.value)}
+                    maxLength={MAX_COMMENT_BODY_LENGTH}
                   />
                   <button
                     onClick={() => submitReply(threadComment.id)}

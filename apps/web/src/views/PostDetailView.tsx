@@ -4,6 +4,7 @@ import { api } from "../lib/api.js";
 import { NEXT_STATES, STATE_LABELS } from "../lib/stateMachine.js";
 import { formatDateDisplay } from "../lib/dates.js";
 import { useAutosizeTextarea } from "../lib/useAutosizeTextarea.js";
+import { MAX_CONTENT_LENGTH } from "../lib/limits.js";
 import { StateBadge } from "../components/StateBadge.js";
 import { LinkedInPreview } from "../components/LinkedInPreview.js";
 import { VersionsPanel } from "../components/VersionsPanel.js";
@@ -218,6 +219,7 @@ export function PostDetailView() {
               value={draft}
               onChange={(e) => setDraft(e.target.value)}
               placeholder="Draft content (markdown subset: **bold**, *italic*, bullets)…"
+              maxLength={MAX_CONTENT_LENGTH}
             />
             <div className="mt-3 flex items-center gap-3">
               <button
@@ -228,6 +230,13 @@ export function PostDetailView() {
                 {saving ? "Saving…" : "Save as new version"}
               </button>
               <span className="text-xs text-gray-400">{versions.length} version(s)</span>
+              <span
+                className={`text-xs ${
+                  draft.length > MAX_CONTENT_LENGTH * 0.95 ? "text-amber-600" : "text-gray-400"
+                }`}
+              >
+                {draft.length.toLocaleString()} / {MAX_CONTENT_LENGTH.toLocaleString()}
+              </span>
             </div>
           </div>
           <div>

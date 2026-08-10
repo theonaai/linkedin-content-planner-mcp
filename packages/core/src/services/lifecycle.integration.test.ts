@@ -5,6 +5,7 @@ import { eq } from "drizzle-orm";
 import { createCoreServices, type CoreServices } from "../context.js";
 import { NotFoundError, ValidationError } from "../errors.js";
 import { InvalidStateTransitionError } from "../stateMachine.js";
+import { MAX_ATTACHMENT_BYTES, MAX_FILENAME_LENGTH } from "../limits.js";
 import type { StorageAdapter } from "../storage.js";
 
 async function waitFor<T>(check: () => Promise<T | undefined>, timeoutMs = 3000): Promise<T> {
@@ -170,6 +171,29 @@ describe.skipIf(!connectionString)("post lifecycle (integration)", () => {
 
     await core.attachments.deleteAttachment(attachment.id);
     expect(await core.attachments.listAttachments(post.id)).toHaveLength(0);
+  });
+
+  it("rejects an attachment over the size limit before it ever reaches storage", async () => {
+    const post = await core.posts.createPost({ workspaceId, initialContent: "oversized attachment test" });
+    const oversized = Buffer.alloc(MAX_ATTACHMENT_BYTES + 1);
+
+    await expect(
+      core.attachments.attachFile({ postId: post.id, filename: "huge.bin", mimeType: "application/octet-stream", data: oversized }),
+    ).rejects.toThrow(ValidationError);
+    expect(await core.attachments.listAttachments(post.id)).toHaveLength(0);
+  });
+
+  it("rejects an attachment with a filename over the length limit", async () => {
+    const post = await core.posts.createPost({ workspaceId, initialContent: "long filename test" });
+
+    await expect(
+      core.attachments.attachFile({
+        postId: post.id,
+        filename: `${"a".repeat(MAX_FILENAME_LENGTH + 1)}.txt`,
+        mimeType: "text/plain",
+        data: Buffer.from("small"),
+      }),
+    ).rejects.toThrow(ValidationError);
   });
 
   it("blocks submitting for review while a comment on the latest version is unresolved", async () => {

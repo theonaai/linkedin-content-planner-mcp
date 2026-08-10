@@ -1,7 +1,7 @@
 import Fastify from "fastify";
 import multipart from "@fastify/multipart";
 import { createDb } from "@linkedin-planner/db";
-import { createCoreServices } from "@linkedin-planner/core";
+import { createCoreServices, MAX_ATTACHMENT_BYTES, MAX_HTTP_BODY_BYTES } from "@linkedin-planner/core";
 import { loadEnv } from "./env.js";
 import { ensureDefaultWorkspace } from "./workspace.js";
 import { registerErrorHandler } from "./errorHandler.js";
@@ -20,8 +20,8 @@ const storage = createLocalFsStorage(env.attachmentsDir);
 const core = createCoreServices(db, storage);
 const workspaceId = await ensureDefaultWorkspace(db);
 
-const app = Fastify({ logger: true });
-await app.register(multipart, { limits: { fileSize: 25 * 1024 * 1024 } });
+const app = Fastify({ logger: true, bodyLimit: MAX_HTTP_BODY_BYTES });
+await app.register(multipart, { limits: { fileSize: MAX_ATTACHMENT_BYTES } });
 registerErrorHandler(app);
 
 app.get("/health", async () => ({ status: "ok" }));

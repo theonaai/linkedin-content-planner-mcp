@@ -7,10 +7,15 @@ import {
   getVersionDiffInputSchema,
   addCommentInputSchema,
   postStateSchema,
-  reviewDecisionSchema,
   strReplaceContentInputSchema,
   createWebhookInputSchema,
   updateWebhookInputSchema,
+  updateContentInputSchema,
+  submitReviewInputSchema,
+  MAX_CONTENT_LENGTH,
+  MAX_FILENAME_LENGTH,
+  MAX_MIME_TYPE_LENGTH,
+  MAX_ATTACHMENT_BASE64_LENGTH,
 } from "@linkedin-planner/core";
 import { toLinkedInPreview, MARKDOWN_SUBSET_DESCRIPTION } from "@linkedin-planner/formatting";
 
@@ -67,7 +72,7 @@ export function createMcpServer(core: CoreServices, workspaceId: string): McpSer
     "update_post_content",
     {
       description: `Create a new version of a post with updated content. ${MARKDOWN_SUBSET_DESCRIPTION}`,
-      inputSchema: { postId: z.string().uuid(), contentMarkdown: z.string() },
+      inputSchema: { postId: z.string().uuid(), ...updateContentInputSchema.shape },
     },
     (args) => safe(() => core.versions.updatePostContent(args))(),
   );
@@ -149,11 +154,7 @@ export function createMcpServer(core: CoreServices, workspaceId: string): McpSer
     {
       description:
         "Approve or request changes on a post that is in_review. Approving moves it to ready; requesting changes moves it back to in_progress and requires a body explaining what to fix.",
-      inputSchema: {
-        postId: z.string().uuid(),
-        decision: reviewDecisionSchema,
-        body: z.string().optional(),
-      },
+      inputSchema: { postId: z.string().uuid(), ...submitReviewInputSchema.shape },
     },
     (args) => safe(() => core.reviews.submitReview(args))(),
   );
@@ -201,7 +202,7 @@ export function createMcpServer(core: CoreServices, workspaceId: string): McpSer
     "render_preview",
     {
       description: `Render content as it will appear on LinkedIn (as Unicode text — bold/italic are real Unicode characters, not markup, since that's what LinkedIn itself renders). Useful to preview before saving, or to sanity-check formatting. ${MARKDOWN_SUBSET_DESCRIPTION}`,
-      inputSchema: { contentMarkdown: z.string() },
+      inputSchema: { contentMarkdown: z.string().max(MAX_CONTENT_LENGTH) },
     },
     (args) => safe(async () => ({ preview: toLinkedInPreview(args.contentMarkdown) }))(),
   );
@@ -210,12 +211,13 @@ export function createMcpServer(core: CoreServices, workspaceId: string): McpSer
     "attach_file",
     {
       description:
-        "Attach a file (e.g. a PDF carousel or image) to a post. Pass the file bytes as base64.",
+        `Attach a file (e.g. a PDF carousel or image) to a post. Pass the file bytes as base64 — ` +
+        `capped at 25 MB (${MAX_ATTACHMENT_BASE64_LENGTH.toLocaleString()} base64 characters).`,
       inputSchema: {
         postId: z.string().uuid(),
-        filename: z.string(),
-        mimeType: z.string(),
-        contentBase64: z.string(),
+        filename: z.string().max(MAX_FILENAME_LENGTH),
+        mimeType: z.string().max(MAX_MIME_TYPE_LENGTH),
+        contentBase64: z.string().max(MAX_ATTACHMENT_BASE64_LENGTH),
       },
     },
     (args) =>
