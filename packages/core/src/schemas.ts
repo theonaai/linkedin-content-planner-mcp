@@ -29,6 +29,11 @@ export const setPostDateInputSchema = z.object({ scheduledDate: z.string().nulla
 
 export const updateContentInputSchema = z.object({ contentMarkdown: z.string() });
 
+export const strReplaceContentInputSchema = z.object({
+  oldStr: z.string().min(1),
+  newStr: z.string(),
+});
+
 export const revertToVersionInputSchema = z.object({ versionId: z.string().uuid() });
 
 export const getVersionDiffInputSchema = z.object({

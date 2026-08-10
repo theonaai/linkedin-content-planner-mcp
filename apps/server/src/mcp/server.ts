@@ -8,6 +8,7 @@ import {
   addCommentInputSchema,
   postStateSchema,
   reviewDecisionSchema,
+  strReplaceContentInputSchema,
 } from "@linkedin-planner/core";
 import { toLinkedInPreview } from "@linkedin-planner/formatting";
 
@@ -64,6 +65,16 @@ export function createMcpServer(core: CoreServices, workspaceId: string): McpSer
       inputSchema: { postId: z.string().uuid(), contentMarkdown: z.string() },
     },
     (args) => safe(() => core.versions.updatePostContent(args))(),
+  );
+
+  server.registerTool(
+    "str_replace_post_content",
+    {
+      description:
+        "Targeted edit: replaces exactly one occurrence of oldStr with newStr in the post's latest content and creates a new version, without reproducing the whole draft. oldStr must match verbatim exactly once — no match or an ambiguous (>1) match both fail with a specific error (the ambiguous case lists the matching line numbers) so you can retry with more context. Prefer this over update_post_content for small, targeted changes (fix a phrase, swap a stat, tweak a line) — it's cheaper and safer than resending the entire draft, and matters even more on longer content like a Substack article.",
+      inputSchema: { postId: z.string().uuid(), ...strReplaceContentInputSchema.shape },
+    },
+    (args) => safe(() => core.versions.strReplaceContent(args))(),
   );
 
   server.registerTool(

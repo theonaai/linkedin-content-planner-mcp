@@ -252,4 +252,42 @@ describe.skipIf(!connectionString)("post lifecycle (integration)", () => {
       /unresolved comment/i,
     );
   });
+
+  it("str-replaces a unique substring without touching the rest of the content", async () => {
+    const post = await core.posts.createPost({
+      workspaceId,
+      initialContent: "Intro line.\n\nThe old CTA goes here.\n\nClosing line.",
+    });
+
+    const updated = await core.versions.strReplaceContent({
+      postId: post.id,
+      oldStr: "The old CTA goes here.",
+      newStr: "A punchier new CTA.",
+    });
+
+    expect(updated.contentMarkdown).toBe("Intro line.\n\nA punchier new CTA.\n\nClosing line.");
+    expect(await core.versions.listVersions(post.id)).toHaveLength(2);
+  });
+
+  it("rejects a str_replace when oldStr isn't found, with a clear message", async () => {
+    const post = await core.posts.createPost({ workspaceId, initialContent: "Some content here." });
+
+    await expect(
+      core.versions.strReplaceContent({ postId: post.id, oldStr: "text that is not present", newStr: "x" }),
+    ).rejects.toThrow(/did not appear verbatim/i);
+  });
+
+  it("rejects an ambiguous str_replace and reports every matching line", async () => {
+    const post = await core.posts.createPost({
+      workspaceId,
+      initialContent: "First: repeat me.\nSecond: repeat me.\nThird: unique.",
+    });
+
+    await expect(
+      core.versions.strReplaceContent({ postId: post.id, oldStr: "repeat me.", newStr: "x" }),
+    ).rejects.toThrow(/not unique.*line\(s\) 1, 2/is);
+
+    // No version should have been created on failure.
+    expect(await core.versions.listVersions(post.id)).toHaveLength(1);
+  });
 });

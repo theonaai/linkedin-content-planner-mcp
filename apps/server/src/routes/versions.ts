@@ -2,6 +2,7 @@ import type { FastifyInstance } from "fastify";
 import {
   type CoreServices,
   updateContentInputSchema,
+  strReplaceContentInputSchema,
   revertToVersionInputSchema,
   getVersionDiffInputSchema,
 } from "@linkedin-planner/core";
@@ -16,6 +17,12 @@ export function registerVersionRoutes(app: FastifyInstance, core: CoreServices) 
     const { id } = request.params as { id: string };
     const input = updateContentInputSchema.parse(request.body);
     return core.versions.updatePostContent({ postId: id, contentMarkdown: input.contentMarkdown });
+  });
+
+  app.post("/api/posts/:id/versions/replace", async (request) => {
+    const { id } = request.params as { id: string };
+    const input = strReplaceContentInputSchema.parse(request.body);
+    return core.versions.strReplaceContent({ postId: id, oldStr: input.oldStr, newStr: input.newStr });
   });
 
   app.post("/api/posts/:id/versions/revert", async (request) => {
