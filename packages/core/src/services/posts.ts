@@ -3,8 +3,10 @@ import { posts, postVersions, comments, stateEvents, type Db } from "@linkedin-p
 import { assertTransition } from "../stateMachine.js";
 import { NotFoundError, ValidationError } from "../errors.js";
 import type { PostState, Platform } from "../types.js";
+import type { AttachmentService } from "./attachments.js";
 
-export function createPostService(db: Db) {
+export function createPostService(db: Db, deps: { attachmentService: AttachmentService }) {
+  const { attachmentService } = deps;
   async function getPost(postId: string) {
     const [post] = await db.select().from(posts).where(eq(posts.id, postId)).limit(1);
     if (!post) throw new NotFoundError("Post", postId);
@@ -129,6 +131,19 @@ export function createPostService(db: Db) {
         .where(eq(posts.id, params.postId))
         .returning();
       return updated;
+    },
+
+    /** Permanent — versions, comments, reviews, and state history all cascade-delete with
+     * the post at the DB level. Attachment files don't (they live in blob storage, not the
+     * DB), so those are deleted explicitly first via the attachment service, which already
+     * knows how to remove both the file and its row together. */
+    async deletePost(postId: string) {
+      await getPost(postId);
+      const existingAttachments = await attachmentService.listAttachments(postId);
+      for (const attachment of existingAttachments) {
+        await attachmentService.deleteAttachment(attachment.id);
+      }
+      await db.delete(posts).where(eq(posts.id, postId));
     },
   };
 }

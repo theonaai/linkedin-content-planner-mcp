@@ -3,8 +3,10 @@ import type { Comment, DiffOp, Platform, Post, PostState, PostVersion, Review, R
 const BASE = "/api";
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
+  // Only set Content-Type when actually sending a body — Fastify's JSON parser rejects a
+  // Content-Type: application/json request with an empty body (as a bodyless DELETE sends).
   const res = await fetch(`${BASE}${path}`, {
-    headers: { "Content-Type": "application/json" },
+    headers: init?.body !== undefined ? { "Content-Type": "application/json" } : undefined,
     ...init,
   });
   if (!res.ok) {
@@ -29,6 +31,7 @@ export const api = {
     request<Post>(`/posts/${id}/state`, { method: "PATCH", body: JSON.stringify({ toState }) }),
   setPostDate: (id: string, scheduledDate: string | null) =>
     request<Post>(`/posts/${id}/date`, { method: "PATCH", body: JSON.stringify({ scheduledDate }) }),
+  deletePost: (id: string) => request<void>(`/posts/${id}`, { method: "DELETE" }),
 
   listVersions: (postId: string) => request<PostVersion[]>(`/posts/${postId}/versions`),
   updateContent: (postId: string, contentMarkdown: string) =>

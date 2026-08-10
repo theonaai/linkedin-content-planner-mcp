@@ -16,6 +16,13 @@ export function registerErrorHandler(app: FastifyInstance) {
     if (err instanceof InvalidStateTransitionError) {
       return reply.code(409).send({ error: err.message });
     }
+    // Fastify's own request-parsing errors (e.g. FST_ERR_CTP_EMPTY_JSON_BODY for a
+    // Content-Type: application/json request with no body, as a bodyless DELETE sends)
+    // already carry a 4xx statusCode — surface that directly instead of masking a client
+    // mistake as a 500.
+    if (typeof err.statusCode === "number" && err.statusCode >= 400 && err.statusCode < 500) {
+      return reply.code(err.statusCode).send({ error: err.message });
+    }
     app.log.error(err);
     reply.code(500).send({ error: "Internal server error" });
   });

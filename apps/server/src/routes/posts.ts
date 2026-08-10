@@ -41,4 +41,10 @@ export function registerPostRoutes(app: FastifyInstance, core: CoreServices, wor
     const input = setPostDateInputSchema.parse(request.body);
     return core.posts.setPostDate({ postId: id, scheduledDate: input.scheduledDate });
   });
+
+  app.delete("/api/posts/:id", async (request, reply) => {
+    const { id } = request.params as { id: string };
+    await core.posts.deletePost(id);
+    return reply.code(204).send();
+  });
 }

@@ -7,11 +7,11 @@ import { createAttachmentService } from "./services/attachments.js";
 import type { StorageAdapter } from "./storage.js";
 
 export function createCoreServices(db: Db, storage: StorageAdapter) {
-  const posts = createPostService(db);
+  const attachments = createAttachmentService(db, storage);
+  const posts = createPostService(db, { attachmentService: attachments });
   const versions = createVersionService(db);
   const comments = createCommentService(db, { versionService: versions });
   const reviews = createReviewService(db, { postService: posts, versionService: versions });
-  const attachments = createAttachmentService(db, storage);
 
   return { posts, versions, comments, reviews, attachments };
 }

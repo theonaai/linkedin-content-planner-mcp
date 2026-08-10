@@ -2,7 +2,7 @@ import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { createDb, workspaces, type Db } from "@linkedin-planner/db";
 import { eq } from "drizzle-orm";
 import { createCoreServices, type CoreServices } from "../context.js";
-import { ValidationError } from "../errors.js";
+import { NotFoundError, ValidationError } from "../errors.js";
 import { InvalidStateTransitionError } from "../stateMachine.js";
 import type { StorageAdapter } from "../storage.js";
 
@@ -289,5 +289,31 @@ describe.skipIf(!connectionString)("post lifecycle (integration)", () => {
 
     // No version should have been created on failure.
     expect(await core.versions.listVersions(post.id)).toHaveLength(1);
+  });
+
+  it("deletes a post along with its versions, comments, and attachment files", async () => {
+    const post = await core.posts.createPost({ workspaceId, initialContent: "throwaway idea" });
+    const version = await core.versions.getLatestVersion(post.id);
+    await core.comments.addComment({ postVersionId: version.id, body: "some feedback" });
+    const attachment = await core.attachments.attachFile({
+      postId: post.id,
+      filename: "carousel.pdf",
+      mimeType: "application/pdf",
+      data: Buffer.from("fake bytes"),
+    });
+
+    await core.posts.deletePost(post.id);
+
+    await expect(core.posts.getPost(post.id)).rejects.toThrow(NotFoundError);
+    expect(await core.versions.listVersions(post.id)).toHaveLength(0);
+    expect(await core.attachments.listAttachments(post.id)).toHaveLength(0);
+    // The underlying file should be gone too, not just the DB row.
+    await expect(core.attachments.downloadAttachment(attachment.id)).rejects.toThrow();
+  });
+
+  it("deleting a nonexistent post throws NotFoundError", async () => {
+    await expect(core.posts.deletePost("00000000-0000-0000-0000-000000000000")).rejects.toThrow(
+      NotFoundError,
+    );
   });
 });

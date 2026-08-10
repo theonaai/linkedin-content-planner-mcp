@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Link, useParams } from "react-router-dom";
+import { Link, useNavigate, useParams } from "react-router-dom";
 import { api } from "../lib/api.js";
 import { NEXT_STATES, STATE_LABELS } from "../lib/stateMachine.js";
 import { formatDateDisplay } from "../lib/dates.js";
@@ -11,6 +11,7 @@ import { CommentsPanel } from "../components/CommentsPanel.js";
 import { ReviewsPanel } from "../components/ReviewsPanel.js";
 import { AttachmentsPanel } from "../components/AttachmentsPanel.js";
 import { ScheduleDialog } from "../components/ScheduleDialog.js";
+import { Modal } from "../components/Modal.js";
 import type { Comment, Post, PostVersion } from "../lib/types.js";
 
 type Tab = "versions" | "comments" | "reviews" | "attachments";
@@ -24,6 +25,7 @@ const TABS: { id: Tab; label: string }[] = [
 
 export function PostDetailView() {
   const { id } = useParams<{ id: string }>();
+  const navigate = useNavigate();
   const [post, setPost] = useState<Post | null>(null);
   const [versions, setVersions] = useState<PostVersion[]>([]);
   const [comments, setComments] = useState<Comment[]>([]);
@@ -34,6 +36,8 @@ export function PostDetailView() {
   const [tab, setTab] = useState<Tab>("versions");
   const [selectedVersionId, setSelectedVersionId] = useState<string | null>(null);
   const [scheduleDialogOpen, setScheduleDialogOpen] = useState(false);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   useAutosizeTextarea(textareaRef, draft);
 
@@ -116,6 +120,19 @@ export function PostDetailView() {
     await load();
   }
 
+  async function handleDelete() {
+    if (!post) return;
+    setDeleting(true);
+    try {
+      await api.deletePost(post.id);
+      navigate("/");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+      setDeleting(false);
+      setDeleteDialogOpen(false);
+    }
+  }
+
   if (loading) return <p className="text-sm text-gray-500">Loading…</p>;
   if (!post) return <p className="text-sm text-red-600">{error ?? "Post not found"}</p>;
 
@@ -129,9 +146,17 @@ export function PostDetailView() {
 
   return (
     <div>
-      <Link to="/" className="mb-4 inline-block text-sm text-gray-500 hover:underline">
-        ← Back to backlog
-      </Link>
+      <div className="mb-4 flex items-center justify-between">
+        <Link to="/" className="inline-block text-sm text-gray-500 hover:underline">
+          ← Back to backlog
+        </Link>
+        <button
+          onClick={() => setDeleteDialogOpen(true)}
+          className="text-sm text-red-600 hover:underline"
+        >
+          Delete post
+        </button>
+      </div>
 
       <div className="rounded-lg bg-white p-4 shadow-sm">
         <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
@@ -257,6 +282,31 @@ export function PostDetailView() {
           onRemove={handleScheduleRemove}
           onClose={() => setScheduleDialogOpen(false)}
         />
+      )}
+
+      {deleteDialogOpen && (
+        <Modal title="Delete post" onClose={() => setDeleteDialogOpen(false)}>
+          <p className="text-sm text-gray-700">
+            This permanently deletes the post, every version, all comments and reviews, and any
+            attachments. This can&apos;t be undone.
+          </p>
+          <div className="mt-4 flex justify-end gap-2">
+            <button
+              onClick={() => setDeleteDialogOpen(false)}
+              disabled={deleting}
+              className="rounded-md border border-gray-300 px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-50"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={handleDelete}
+              disabled={deleting}
+              className="rounded-md bg-red-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-red-700 disabled:opacity-40"
+            >
+              {deleting ? "Deleting…" : "Delete permanently"}
+            </button>
+          </div>
+        </Modal>
       )}
     </div>
   );

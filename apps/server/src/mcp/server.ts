@@ -13,7 +13,10 @@ import {
 import { toLinkedInPreview } from "@linkedin-planner/formatting";
 
 function jsonContent(data: unknown) {
-  return { content: [{ type: "text" as const, text: JSON.stringify(data, null, 2) }] };
+  // JSON.stringify(undefined) returns undefined, not a string, which the MCP SDK's own
+  // response validation rejects — fall back to null for tools whose core function returns
+  // void (e.g. delete_post) so the result is always a valid text content block.
+  return { content: [{ type: "text" as const, text: JSON.stringify(data ?? null, null, 2) }] };
 }
 
 function safe<T>(fn: () => Promise<T>) {
@@ -121,6 +124,21 @@ export function createMcpServer(core: CoreServices, workspaceId: string): McpSer
       inputSchema: { postId: z.string().uuid(), scheduledDate: z.string().nullable() },
     },
     (args) => safe(() => core.posts.setPostDate(args))(),
+  );
+
+  server.registerTool(
+    "delete_post",
+    {
+      description:
+        "Permanently delete a post and everything attached to it (all versions, comments, reviews, and attachment files). Irreversible — there is no undo. Use for genuinely unwanted posts (duplicates, abandoned ideas), not as a way to unpublish something already posted.",
+      inputSchema: { postId: z.string().uuid() },
+      annotations: { destructiveHint: true, idempotentHint: false },
+    },
+    (args) =>
+      safe(async () => {
+        await core.posts.deletePost(args.postId);
+        return { deleted: true, postId: args.postId };
+      })(),
   );
 
   server.registerTool(
