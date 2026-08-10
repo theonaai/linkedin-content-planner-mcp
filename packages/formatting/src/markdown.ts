@@ -1,6 +1,17 @@
 import { toBoldItalicUnicode, toBoldUnicode, toItalicUnicode } from "./unicodeAlphabet.js";
 
 /**
+ * The single source of truth for what syntax toLinkedInPreview actually implements —
+ * exported so every caller (MCP tool descriptions, docs, etc.) can quote the real, current
+ * rules instead of a hand-copied summary that can drift out of sync with the code below.
+ */
+export const MARKDOWN_SUBSET_DESCRIPTION =
+  'Markdown subset, not full Markdown: **bold**, *italic* or _italic_, ***bold italic***, ' +
+  'a line starting with "- " becomes a bullet point, and line breaks are literal (use a ' +
+  "blank line between paragraphs, matching how LinkedIn posts are actually spaced). " +
+  "Nothing else is special — headings, links, tables, etc. are not supported and are left as literal text.";
+
+/**
  * Converts a line starting with "- " (LinkedIn's supported bullet syntax in this app)
  * into a real bullet character, since LinkedIn renders neither markdown lists nor "-".
  */

@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { toLinkedInPreview } from "./markdown.js";
+import { toLinkedInPreview, MARKDOWN_SUBSET_DESCRIPTION } from "./markdown.js";
 import { toBoldUnicode, toItalicUnicode, toBoldItalicUnicode } from "./unicodeAlphabet.js";
 
 describe("toLinkedInPreview", () => {
@@ -32,5 +32,17 @@ describe("toLinkedInPreview", () => {
 
   it("does not treat mid-line hyphens as bullets", () => {
     expect(toLinkedInPreview("state-of-the-art results")).toBe("state-of-the-art results");
+  });
+});
+
+describe("MARKDOWN_SUBSET_DESCRIPTION", () => {
+  // Guards against the description silently drifting out of sync with what the code above
+  // actually implements — if a syntax form is added/removed there, this should fail too.
+  it("mentions every syntax form the implementation actually supports", () => {
+    expect(MARKDOWN_SUBSET_DESCRIPTION).toContain("**bold**");
+    expect(MARKDOWN_SUBSET_DESCRIPTION).toContain("*italic*");
+    expect(MARKDOWN_SUBSET_DESCRIPTION).toContain("_italic_");
+    expect(MARKDOWN_SUBSET_DESCRIPTION).toContain("***bold italic***");
+    expect(MARKDOWN_SUBSET_DESCRIPTION).toContain('"- "');
   });
 });

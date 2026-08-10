@@ -10,7 +10,7 @@ import {
   reviewDecisionSchema,
   strReplaceContentInputSchema,
 } from "@linkedin-planner/core";
-import { toLinkedInPreview } from "@linkedin-planner/formatting";
+import { toLinkedInPreview, MARKDOWN_SUBSET_DESCRIPTION } from "@linkedin-planner/formatting";
 
 function jsonContent(data: unknown) {
   // JSON.stringify(undefined) returns undefined, not a string, which the MCP SDK's own
@@ -64,7 +64,7 @@ export function createMcpServer(core: CoreServices, workspaceId: string): McpSer
   server.registerTool(
     "update_post_content",
     {
-      description: "Create a new version of a post with updated content (markdown subset: **bold**, *italic*, line breaks, simple bullets).",
+      description: `Create a new version of a post with updated content. ${MARKDOWN_SUBSET_DESCRIPTION}`,
       inputSchema: { postId: z.string().uuid(), contentMarkdown: z.string() },
     },
     (args) => safe(() => core.versions.updatePostContent(args))(),
@@ -74,7 +74,8 @@ export function createMcpServer(core: CoreServices, workspaceId: string): McpSer
     "str_replace_post_content",
     {
       description:
-        "Targeted edit: replaces exactly one occurrence of oldStr with newStr in the post's latest content and creates a new version, without reproducing the whole draft. oldStr must match verbatim exactly once — no match or an ambiguous (>1) match both fail with a specific error (the ambiguous case lists the matching line numbers) so you can retry with more context. Prefer this over update_post_content for small, targeted changes (fix a phrase, swap a stat, tweak a line) — it's cheaper and safer than resending the entire draft, and matters even more on longer content like a Substack article.",
+        "Targeted edit: replaces exactly one occurrence of oldStr with newStr in the post's latest content and creates a new version, without reproducing the whole draft. oldStr must match verbatim exactly once — no match or an ambiguous (>1) match both fail with a specific error (the ambiguous case lists the matching line numbers) so you can retry with more context. Prefer this over update_post_content for small, targeted changes (fix a phrase, swap a stat, tweak a line) — it's cheaper and safer than resending the entire draft, and matters even more on longer content like a Substack article. " +
+        `Content follows the same rules as update_post_content: ${MARKDOWN_SUBSET_DESCRIPTION}`,
       inputSchema: { postId: z.string().uuid(), ...strReplaceContentInputSchema.shape },
     },
     (args) => safe(() => core.versions.strReplaceContent(args))(),
@@ -197,7 +198,7 @@ export function createMcpServer(core: CoreServices, workspaceId: string): McpSer
   server.registerTool(
     "render_preview",
     {
-      description: "Render markdown-subset content as it will appear on LinkedIn (Unicode bold/italic).",
+      description: `Render content as it will appear on LinkedIn (as Unicode text — bold/italic are real Unicode characters, not markup, since that's what LinkedIn itself renders). Useful to preview before saving, or to sanity-check formatting. ${MARKDOWN_SUBSET_DESCRIPTION}`,
       inputSchema: { contentMarkdown: z.string() },
     },
     (args) => safe(async () => ({ preview: toLinkedInPreview(args.contentMarkdown) }))(),
