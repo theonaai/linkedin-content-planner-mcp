@@ -7,7 +7,12 @@ import { createSessionToken, verifySessionToken, SESSION_COOKIE_NAME, SESSION_TT
 const FLOW_COOKIE_NAME = "theona_oauth_flow";
 /** Short-lived — only needs to survive the redirect round trip to aidl-002 and back. */
 const FLOW_COOKIE_TTL_SECONDS = 5 * 60;
-const IDENTITY_SCOPE = "identity";
+// aidl-002's oidc-provider gates /oauth/userinfo on the standard `openid` scope at the
+// library level — a token minted for `identity` alone gets 403 insufficient_scope there,
+// regardless of aidl-002's own claims mapping for `identity`. Must request both together
+// (aidl-002 PR #1885 review, https://github.com/theonaai/aidl-002/pull/1885). Matches
+// IDENTITY_LOGIN_SCOPE on that side.
+const IDENTITY_LOGIN_SCOPE = "openid identity";
 
 interface FlowCookiePayload {
   verifier: string;
@@ -29,8 +34,8 @@ interface TheonaUserinfo {
 }
 
 /** "Sign in with Theona" — the planner acts as an OAuth *client* to aidl-002's existing
- * authorization server, requesting only the `identity` scope (see the aidl-002-side plan doc):
- * no MCP privileges, just enough to know who's signing in. Everything downstream (session,
+ * authorization server, requesting `openid identity` (see IDENTITY_LOGIN_SCOPE above): no
+ * MCP privileges, just enough to know who's signing in. Everything downstream (session,
  * workspace membership) is entirely the planner's own — aidl-002 is never touched again once
  * this exchange completes. */
 export function registerAuthRoutes(app: FastifyInstance, core: CoreServices, auth: AuthEnv) {
@@ -54,7 +59,7 @@ export function registerAuthRoutes(app: FastifyInstance, core: CoreServices, aut
     const authorizeUrl = new URL("/oauth/authorize", `${auth.theonaIssuer}/`);
     authorizeUrl.searchParams.set("client_id", auth.theonaClientId);
     authorizeUrl.searchParams.set("response_type", "code");
-    authorizeUrl.searchParams.set("scope", IDENTITY_SCOPE);
+    authorizeUrl.searchParams.set("scope", IDENTITY_LOGIN_SCOPE);
     authorizeUrl.searchParams.set("redirect_uri", `${auth.appPublicBaseUrl}/api/auth/callback`);
     authorizeUrl.searchParams.set("state", state);
     authorizeUrl.searchParams.set("code_challenge", challenge);

@@ -35,7 +35,10 @@ async function main() {
       grant_types: ["authorization_code", "refresh_token"],
       response_types: ["code"],
       token_endpoint_auth_method: "none",
-      scope: "identity",
+      // aidl-002's oidc-provider gates /oauth/userinfo on the standard `openid` scope at the
+      // library level — `identity` alone mints a token that gets 403 there. Must register
+      // (and later request) both together. See aidl-002 PR #1885 review.
+      scope: "openid identity",
     }),
   });
 
