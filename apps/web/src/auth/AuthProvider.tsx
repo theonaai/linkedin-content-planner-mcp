@@ -44,6 +44,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         if (res.status === 401) return setStatus({ kind: "unauthenticated" });
         if (!res.ok) throw new Error(`Failed to check auth status: ${res.status}`);
         const data = (await res.json()) as { userId: string; memberships: Membership[] };
+
+        // Resolve (and correct, if stale) the active workspace BEFORE flipping status to
+        // "authenticated" — both state updates land in the same batch, so no child ever
+        // mounts and fires its own data-fetch with a stale/invalid workspaceId still attached
+        // to outgoing requests. Doing this correction reactively in a separate effect (the
+        // previous approach) raced with children's own mount-time fetches: a workspaceId left
+        // over in localStorage from a previous login could outlive its membership (e.g. after
+        // switching accounts, or workspace data getting reset) and briefly get sent as
+        // x-workspace-id before the correction effect had a chance to run.
+        const stored = getActiveWorkspaceId();
+        const stillValid = data.memberships.some((m) => m.workspaceId === stored);
+        const resolvedWorkspaceId = stillValid ? stored : (data.memberships[0]?.workspaceId ?? null);
+        if (resolvedWorkspaceId && resolvedWorkspaceId !== stored) {
+          persistActiveWorkspaceId(resolvedWorkspaceId);
+        }
+        setActiveWorkspaceIdState(resolvedWorkspaceId);
         setStatus({ kind: "authenticated", userId: data.userId, memberships: data.memberships });
       })
       .catch(() => {
@@ -53,17 +69,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       cancelled = true;
     };
   }, []);
-
-  useEffect(() => {
-    if (status.kind !== "authenticated" || status.memberships.length === 0) return;
-    // Falls back to the first membership if nothing was ever selected, or if the stored
-    // choice points at a workspace this user no longer belongs to.
-    const stillValid = status.memberships.some((m) => m.workspaceId === activeWorkspaceId);
-    if (!stillValid) {
-      persistActiveWorkspaceId(status.memberships[0].workspaceId);
-      setActiveWorkspaceIdState(status.memberships[0].workspaceId);
-    }
-  }, [status, activeWorkspaceId]);
 
   function setActiveWorkspaceId(id: string) {
     persistActiveWorkspaceId(id);
