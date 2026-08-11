@@ -20,8 +20,8 @@
     "@linkedin-planner/db": "workspace:*",
     "@linkedin-planner/formatting": "workspace:*",
     "@modelcontextprotocol/sdk": "^1.10.2",
-    "drizzle-orm": "^0.38.3",
-    "fastify": "5.2.1",
+    "drizzle-orm": "^0.45.2",
+    "fastify": "5.11.3",
     "jose": "^6.2.8",
     "oidc-provider": "^9.11.3",
     "zod": "^3.24.1"
