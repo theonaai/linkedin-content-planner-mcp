@@ -2,6 +2,7 @@
   "name": "linkedin-planner",
   "private": true,
   "version": "0.0.0",
+  "license": "SEE LICENSE IN LICENSE.md",
   "engines": {
     "node": ">=20"
   },

@@ -34,3 +34,9 @@ pnpm dev:server
 - `packages/core` — domain types and service layer shared by REST and MCP.
 - `packages/formatting` — markdown-subset ⇄ LinkedIn Unicode formatting.
 - `packages/db` — Drizzle ORM schema and migrations.
+
+## License
+
+[PolyForm Noncommercial License 1.0.0](./LICENSE.md). Source-available, not OSI open source: free
+to use, modify, and self-host for any noncommercial purpose; any commercial or paid use requires a
+separate license from Theona.
