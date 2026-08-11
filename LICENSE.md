@@ -1,4 +1,4 @@
-Copyright (c) 2026 Theona
+Copyright (c) 2026 Theona, Inc.
 
 # PolyForm Noncommercial License 1.0.0
 

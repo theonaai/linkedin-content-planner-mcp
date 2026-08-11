@@ -62,4 +62,4 @@ each.
 
 [PolyForm Noncommercial License 1.0.0](./LICENSE.md). Source-available, not OSI open source: free
 to use, modify, and self-host for any noncommercial purpose; any commercial or paid use requires a
-separate license from Theona.
+separate license from Theona, Inc.
