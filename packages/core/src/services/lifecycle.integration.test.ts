@@ -1,12 +1,12 @@
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { createServer, type Server } from "node:http";
 import { randomUUID } from "node:crypto";
-import { createDb, workspaces, users, memberships, type Db } from "@linkedin-planner/db";
+import { createDb, workspaces, users, memberships, attachments, type Db } from "@linkedin-planner/db";
 import { eq } from "drizzle-orm";
 import { createCoreServices, type CoreServices } from "../context.js";
 import { NotFoundError, ValidationError } from "../errors.js";
 import { InvalidStateTransitionError } from "../stateMachine.js";
-import { MAX_ATTACHMENT_BYTES, MAX_FILENAME_LENGTH } from "../limits.js";
+import { MAX_ATTACHMENT_BYTES, MAX_FILENAME_LENGTH, MAX_WORKSPACE_ATTACHMENT_BYTES } from "../limits.js";
 import type { StorageAdapter } from "../storage.js";
 
 async function waitFor<T>(check: () => Promise<T | undefined>, timeoutMs = 3000): Promise<T> {
@@ -195,6 +195,54 @@ describe.skipIf(!connectionString)("post lifecycle (integration)", () => {
         data: Buffer.from("small"),
       }),
     ).rejects.toThrow(ValidationError);
+  });
+
+  it("rejects an upload that would push the workspace's total attachment storage over its limit", async () => {
+    const post = await core.posts.createPost({ workspaceId, initialContent: "storage limit test" });
+    // Simulate existing usage directly rather than uploading gigabytes of real data.
+    await db.insert(attachments).values({
+      postId: post.id,
+      storageKey: "synthetic/near-limit",
+      filename: "existing.bin",
+      mimeType: "application/octet-stream",
+      sizeBytes: MAX_WORKSPACE_ATTACHMENT_BYTES - 100,
+    });
+
+    await expect(
+      core.attachments.attachFile({
+        postId: post.id,
+        filename: "tips-it-over.bin",
+        mimeType: "application/octet-stream",
+        data: Buffer.alloc(1000),
+      }),
+    ).rejects.toThrow(ValidationError);
+
+    // Don't leave the near-limit synthetic attachment behind — it would pollute every
+    // subsequent test in this workspace, not just this one.
+    await core.posts.deletePost(post.id);
+  });
+
+  it("does not count another workspace's attachments toward this workspace's storage limit", async () => {
+    const [otherWorkspace] = await db.insert(workspaces).values({ name: "storage-limit-isolation-test" }).returning();
+    const otherPost = await core.posts.createPost({ workspaceId: otherWorkspace.id, initialContent: "other workspace" });
+    await db.insert(attachments).values({
+      postId: otherPost.id,
+      storageKey: "synthetic/other-workspace-near-limit",
+      filename: "existing.bin",
+      mimeType: "application/octet-stream",
+      sizeBytes: MAX_WORKSPACE_ATTACHMENT_BYTES - 100,
+    });
+
+    const post = await core.posts.createPost({ workspaceId, initialContent: "unaffected by other workspace" });
+    const attachment = await core.attachments.attachFile({
+      postId: post.id,
+      filename: "fine.bin",
+      mimeType: "application/octet-stream",
+      data: Buffer.alloc(1000),
+    });
+    expect(attachment.sizeBytes).toBe(1000);
+
+    await db.delete(workspaces).where(eq(workspaces.id, otherWorkspace.id));
   });
 
   it("blocks submitting for review while a comment on the latest version is unresolved", async () => {

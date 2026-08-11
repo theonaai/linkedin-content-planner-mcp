@@ -1,8 +1,13 @@
 import { randomUUID } from "node:crypto";
-import { eq, asc } from "drizzle-orm";
-import { attachments, type Db } from "@linkedin-planner/db";
+import { eq, asc, sql } from "drizzle-orm";
+import { attachments, posts, type Db } from "@linkedin-planner/db";
 import { NotFoundError, ValidationError } from "../errors.js";
-import { MAX_ATTACHMENT_BYTES, MAX_FILENAME_LENGTH, MAX_MIME_TYPE_LENGTH } from "../limits.js";
+import {
+  MAX_ATTACHMENT_BYTES,
+  MAX_FILENAME_LENGTH,
+  MAX_MIME_TYPE_LENGTH,
+  MAX_WORKSPACE_ATTACHMENT_BYTES,
+} from "../limits.js";
 import type { StorageAdapter } from "../storage.js";
 
 export function createAttachmentService(db: Db, storage: StorageAdapter) {
@@ -33,6 +38,22 @@ export function createAttachmentService(db: Db, storage: StorageAdapter) {
       }
       if (params.mimeType.length > MAX_MIME_TYPE_LENGTH) {
         throw new ValidationError(`MIME type too long: exceeds ${MAX_MIME_TYPE_LENGTH} characters.`);
+      }
+
+      const [post] = await db.select({ workspaceId: posts.workspaceId }).from(posts).where(eq(posts.id, params.postId)).limit(1);
+      if (!post) throw new NotFoundError("Post", params.postId);
+
+      const [{ total }] = await db
+        .select({ total: sql<number>`coalesce(sum(${attachments.sizeBytes}), 0)::int` })
+        .from(attachments)
+        .innerJoin(posts, eq(attachments.postId, posts.id))
+        .where(eq(posts.workspaceId, post.workspaceId));
+      if (total + params.data.length > MAX_WORKSPACE_ATTACHMENT_BYTES) {
+        throw new ValidationError(
+          `Workspace attachment storage limit exceeded: this upload would bring total usage to ` +
+            `${total + params.data.length} bytes, over the ${MAX_WORKSPACE_ATTACHMENT_BYTES}-byte (250 MB) limit. ` +
+            `Delete unused attachments to free up space.`,
+        );
       }
 
       const storageKey = `${params.postId}/${randomUUID()}-${params.filename}`;

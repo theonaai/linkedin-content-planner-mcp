@@ -10,6 +10,9 @@ export const MAX_WEBHOOK_URL_LENGTH = 2048;
 export const MAX_WEBHOOK_SECRET_LENGTH = 256;
 
 export const MAX_ATTACHMENT_BYTES = 25 * 1024 * 1024;
+// Total attachment storage a single workspace may accumulate across all its posts, not just
+// one upload — prevents unbounded growth from many small (individually-under-the-cap) files.
+export const MAX_WORKSPACE_ATTACHMENT_BYTES = 250 * 1024 * 1024; // 250 MB
 export const MAX_FILENAME_LENGTH = 255;
 export const MAX_MIME_TYPE_LENGTH = 128; // matches the DB column's varchar(128)
 
