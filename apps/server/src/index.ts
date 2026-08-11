@@ -20,6 +20,7 @@ import { registerOAuthRoutes } from "./routes/oauth.js";
 import { registerWellKnownRoutes } from "./routes/well-known.js";
 import { registerMcpRoutes } from "./mcp/route.js";
 import { initOAuthDb } from "./services/oauth/db.js";
+import { registerStaticWeb } from "./staticWeb.js";
 
 const env = loadEnv();
 const db = createDb(env.databaseUrl);
@@ -55,5 +56,8 @@ if (env.auth.enabled) {
   await registerOAuthRoutes(app, env.auth);
   registerWellKnownRoutes(app, env.auth);
 }
+
+// Must be last: registers a catch-all 404 handler that falls back to the SPA's index.html.
+await registerStaticWeb(app);
 
 await app.listen({ port: env.port, host: "0.0.0.0" });

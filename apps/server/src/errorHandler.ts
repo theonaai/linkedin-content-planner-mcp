@@ -1,10 +1,10 @@
-import type { FastifyInstance } from "fastify";
+import type { FastifyError, FastifyInstance } from "fastify";
 import { ZodError } from "zod";
 import { NotFoundError, ValidationError, InvalidStateTransitionError } from "@linkedin-planner/core";
 import { UnauthorizedError } from "./auth/errors.js";
 
 export function registerErrorHandler(app: FastifyInstance) {
-  app.setErrorHandler((err, _req, reply) => {
+  app.setErrorHandler<FastifyError>((err, _req, reply) => {
     if (err instanceof ZodError) {
       return reply.code(400).send({ error: "Invalid input", issues: err.issues });
     }

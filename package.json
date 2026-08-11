@@ -4,7 +4,7 @@
   "version": "0.0.0",
   "license": "SEE LICENSE IN LICENSE.md",
   "engines": {
-    "node": ">=20"
+    "node": ">=22.13"
   },
   "packageManager": "pnpm@11.20.0",
   "scripts": {
