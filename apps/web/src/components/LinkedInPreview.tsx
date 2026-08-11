@@ -27,6 +27,7 @@ export interface CommentableConfig {
 }
 
 type Overlay =
+  | { type: "pending"; offset: number; length: number; text: string; top: number; left: number }
   | { type: "compose"; offset: number; length: number; text: string; top: number; left: number }
   | { type: "thread"; commentId: string; top: number; left: number };
 
@@ -166,7 +167,7 @@ export function LinkedInPreview({ content, commentable }: { content: string; com
     const rect = range.getBoundingClientRect();
     const areaRect = contentAreaRef.current!.getBoundingClientRect();
     setOverlay({
-      type: "compose",
+      type: "pending",
       offset: baseOffset + preRange.toString().length,
       length: text.length,
       text,
@@ -287,6 +288,17 @@ export function LinkedInPreview({ content, commentable }: { content: string; com
                   {renderAnnotated(hiddenText, hiddenAnchors, "h", handleMarkClick)}
                 </div>
               </>
+            )}
+
+            {overlay?.type === "pending" && (
+              <button
+                style={{ top: Math.max(0, overlay.top - 34), left: overlay.left }}
+                className="absolute z-10 flex items-center gap-1 rounded-md bg-gray-900 px-2.5 py-1.5 text-xs font-medium text-white shadow-lg hover:bg-gray-800"
+                onClick={() => setOverlay({ ...overlay, type: "compose" })}
+              >
+                <CommentIcon className="h-3.5 w-3.5" />
+                Comment
+              </button>
             )}
 
             {overlay?.type === "compose" && (
