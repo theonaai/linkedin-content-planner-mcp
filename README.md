@@ -1,6 +1,18 @@
-# LinkedIn Content Planner
+# LinkedIn Content Planner (MCP)
 
-MCP-first service for planning and preparing LinkedIn content. See [PLAN.md](./PLAN.md) and [ARCHITECTURE.md](./ARCHITECTURE.md) for the design.
+A LinkedIn content pipeline built for AI agents, not humans typing into a text box. Your agent
+(Claude Code, Claude Desktop, or any [MCP](https://modelcontextprotocol.io)-compatible client, on
+whatever schedule you run it — cron, an agent loop, a chat session) drafts, formats, and moves
+posts through a review pipeline by calling MCP tools directly: `create_post`,
+`update_post_content`, `submit_review`, and more. A human just reviews, comments, and
+approves/requests changes from the web UI before anything goes live — the same shape as reviewing
+a PR before merge, not manually operating a scheduling tool.
+
+Multi-tenant and OAuth-secured out of the box: agents authenticate against the planner's own
+OAuth 2.1 authorization server (PKCE, dynamic client registration) and every MCP call is scoped to
+the caller's workspace.
+
+See [PLAN.md](./PLAN.md) and [ARCHITECTURE.md](./ARCHITECTURE.md) for the full design.
 
 ## Local development
 
@@ -26,6 +38,17 @@ DATABASE_URL=postgres://linkedin_planner:linkedin_planner@localhost:5432/linkedi
 # 5. Run the server
 pnpm dev:server
 ```
+
+## MCP tool surface
+
+Posts: `create_post`, `list_posts`, `get_post`, `update_post_content`, `str_replace_post_content`,
+`set_post_state`, `set_post_date`, `delete_post`. Versions: `list_versions`, `get_version_diff`,
+`revert_to_version`. Review: `submit_review`, `list_reviews`. Comments: `add_comment`,
+`list_comments`, `resolve_comment`. Attachments: `attach_file`, `list_attachments`. Preview:
+`render_preview`. Webhooks (subscribe to post lifecycle events): `create_webhook`,
+`list_webhooks`, `update_webhook`, `delete_webhook`, `list_webhook_deliveries`. Full tool schemas
+are served at the `/mcp` endpoint itself; see [PLAN.md](./PLAN.md) for the design rationale behind
+each.
 
 ## Monorepo layout
 
