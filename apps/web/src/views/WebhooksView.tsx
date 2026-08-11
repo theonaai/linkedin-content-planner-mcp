@@ -12,6 +12,10 @@ const EVENT_LABELS: Record<WebhookEvent, string> = {
   "post.deleted": "Post deleted",
 };
 
+const inputClass =
+  "w-full rounded-xl border border-border bg-surface-2 px-4 py-3 text-sm text-text-primary outline-none focus:border-accent focus:bg-surface-1 focus:ring-4 focus:ring-accent-soft";
+const labelClass = "text-[11px] font-medium uppercase tracking-[0.14em] text-text-muted";
+
 function NewWebhookForm({ onCreated }: { onCreated: () => void }) {
   const [url, setUrl] = useState("");
   const [secret, setSecret] = useState("");
@@ -41,46 +45,59 @@ function NewWebhookForm({ onCreated }: { onCreated: () => void }) {
   }
 
   return (
-    <div className="rounded-lg border border-gray-200 bg-white p-4">
-      <p className="mb-3 text-sm font-semibold text-gray-900">Add webhook</p>
-      <div className="flex flex-col gap-3">
-        <div>
-          <label className="mb-1 block text-xs font-medium text-gray-500" htmlFor="webhook-url">
+    <div className="max-w-[900px] rounded-2xl border border-border bg-surface-1 p-7 shadow-card">
+      <h2 className="mb-5 text-lg font-semibold tracking-tight text-text-primary">Add webhook</h2>
+      <div className="flex flex-col gap-4">
+        <div className="flex flex-col gap-2">
+          <label className={labelClass} htmlFor="webhook-url">
             URL
           </label>
           <input
             id="webhook-url"
             type="url"
             placeholder="https://example.com/hooks/linkedin-planner"
-            className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
+            className={inputClass}
             value={url}
             onChange={(e) => setUrl(e.target.value)}
             maxLength={MAX_WEBHOOK_URL_LENGTH}
           />
         </div>
-        <div>
-          <label className="mb-1 block text-xs font-medium text-gray-500" htmlFor="webhook-secret">
-            Signing secret (optional)
+        <div className="flex flex-col gap-2">
+          <label className={labelClass} htmlFor="webhook-secret">
+            Signing secret <span className="normal-case tracking-normal text-text-muted">(optional)</span>
           </label>
           <input
             id="webhook-secret"
             type="text"
             placeholder="Used to sign deliveries with X-Webhook-Signature"
-            className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
+            className={inputClass}
             value={secret}
             onChange={(e) => setSecret(e.target.value)}
             maxLength={MAX_WEBHOOK_SECRET_LENGTH}
           />
         </div>
-        <div>
-          <p className="mb-1 text-xs font-medium text-gray-500">Trigger on</p>
-          <div className="grid grid-cols-2 gap-1.5">
-            {WEBHOOK_EVENTS.map((event) => (
-              <label key={event} className="flex items-center gap-2 text-sm text-gray-700">
-                <input type="checkbox" checked={events.includes(event)} onChange={() => toggleEvent(event)} />
-                {EVENT_LABELS[event]}
-              </label>
-            ))}
+        <div className="flex flex-col gap-3">
+          <p className={labelClass}>Trigger on</p>
+          <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2">
+            {WEBHOOK_EVENTS.map((event) => {
+              const on = events.includes(event);
+              return (
+                <label
+                  key={event}
+                  className={`flex cursor-pointer items-center gap-2.5 rounded-lg border px-3.5 py-3 text-sm ${
+                    on ? "border-[rgba(229,81,43,0.3)] bg-accent-soft text-text-primary" : "border-border bg-surface-2 text-text-primary"
+                  }`}
+                >
+                  <input
+                    type="checkbox"
+                    checked={on}
+                    onChange={() => toggleEvent(event)}
+                    className="h-4 w-4 accent-accent"
+                  />
+                  {EVENT_LABELS[event]}
+                </label>
+              );
+            })}
           </div>
         </div>
         {error && <p className="text-xs text-red-600">{error}</p>}
@@ -88,7 +105,7 @@ function NewWebhookForm({ onCreated }: { onCreated: () => void }) {
           <button
             onClick={handleSubmit}
             disabled={submitting || !url.trim() || events.length === 0}
-            className="rounded-md bg-gray-900 px-3 py-1.5 text-sm font-medium text-white disabled:opacity-40"
+            className="rounded-full bg-accent px-6 py-2.5 text-sm font-semibold text-white hover:bg-accent-hover disabled:opacity-40"
           >
             Add webhook
           </button>
@@ -109,23 +126,23 @@ function DeliveryLog({ webhookId }: { webhookId: string }) {
       .finally(() => setLoading(false));
   }, [webhookId]);
 
-  if (loading) return <p className="text-xs text-gray-400">Loading deliveries…</p>;
-  if (deliveries.length === 0) return <p className="text-xs text-gray-400">No deliveries yet.</p>;
+  if (loading) return <p className="text-xs text-text-muted">Loading deliveries…</p>;
+  if (deliveries.length === 0) return <p className="text-xs text-text-muted">No deliveries yet.</p>;
 
   return (
-    <div className="flex flex-col gap-1.5">
+    <div className="flex flex-col gap-2">
       {deliveries.map((d) => (
         <div
           key={d.id}
-          className={`rounded-md border p-2 text-xs ${
-            d.success ? "border-emerald-200 bg-emerald-50" : "border-red-200 bg-red-50"
+          className={`rounded-lg border p-3 text-xs ${
+            d.success ? "border-border bg-surface-2" : "border-red-200 bg-red-50"
           }`}
         >
           <div className="flex items-center justify-between">
-            <span className="font-medium">{EVENT_LABELS[d.event]}</span>
-            <span className="text-gray-400">{new Date(d.createdAt).toLocaleString()}</span>
+            <span className="font-medium text-text-primary">{EVENT_LABELS[d.event]}</span>
+            <span className="text-text-muted">{new Date(d.createdAt).toLocaleString()}</span>
           </div>
-          <p className="mt-0.5 text-gray-600">
+          <p className="mt-0.5 text-text-secondary">
             {d.success ? `Delivered (HTTP ${d.responseStatus})` : `Failed${d.error ? `: ${d.error}` : ""}`}
           </p>
         </div>
@@ -160,42 +177,39 @@ function WebhookRow({ webhook, onChanged }: { webhook: Webhook; onChanged: () =>
   }
 
   return (
-    <div className="rounded-lg border border-gray-200 bg-white p-4">
-      <div className="flex items-start justify-between gap-3">
+    <div className="border-b border-border px-5 py-4 last:border-b-0">
+      <div className="flex items-start justify-between gap-4">
         <div className="min-w-0">
-          <p className="truncate text-sm font-medium text-gray-900">{webhook.url}</p>
-          <div className="mt-1.5 flex flex-wrap gap-1">
+          <p className="truncate text-sm font-medium text-text-primary">{webhook.url}</p>
+          <div className="mt-1.5 flex flex-wrap gap-1.5">
             {webhook.events.map((event) => (
-              <span key={event} className="rounded-full bg-gray-100 px-2 py-0.5 text-xs text-gray-600">
+              <span key={event} className="rounded-full bg-surface-2 px-2 py-0.5 text-[11px] text-text-secondary">
                 {EVENT_LABELS[event]}
               </span>
             ))}
           </div>
         </div>
         <span
-          className={`shrink-0 rounded-full px-2 py-0.5 text-xs font-medium ${
-            webhook.active ? "bg-emerald-100 text-emerald-700" : "bg-gray-100 text-gray-500"
+          className={`shrink-0 rounded-full px-2.5 py-1 text-[11px] font-medium ${
+            webhook.active ? "bg-accent-soft text-accent-text" : "bg-surface-3 text-text-muted"
           }`}
         >
           {webhook.active ? "Active" : "Paused"}
         </span>
       </div>
-      <div className="mt-3 flex items-center gap-3 text-xs">
-        <button onClick={toggleActive} disabled={busy} className="text-gray-600 hover:underline disabled:opacity-40">
+      <div className="mt-3 flex items-center gap-4 text-xs">
+        <button onClick={toggleActive} disabled={busy} className="text-text-secondary hover:underline disabled:opacity-40">
           {webhook.active ? "Pause" : "Resume"}
         </button>
-        <button
-          onClick={() => setShowDeliveries((v) => !v)}
-          className="text-gray-600 hover:underline"
-        >
+        <button onClick={() => setShowDeliveries((v) => !v)} className="text-text-secondary hover:underline">
           {showDeliveries ? "Hide deliveries" : "View deliveries"}
         </button>
-        <button onClick={handleDelete} disabled={busy} className="text-red-600 hover:underline disabled:opacity-40">
-          Delete
+        <button onClick={handleDelete} disabled={busy} className="text-accent-text hover:underline disabled:opacity-40">
+          Remove
         </button>
       </div>
       {showDeliveries && (
-        <div className="mt-3 border-t border-gray-100 pt-3">
+        <div className="mt-3 border-t border-border pt-3">
           <DeliveryLog webhookId={webhook.id} />
         </div>
       )}
@@ -218,20 +232,26 @@ export function WebhooksView() {
 
   return (
     <div className="flex flex-col gap-6">
-      <div>
-        <h1 className="text-lg font-semibold text-gray-900">Webhooks</h1>
-        <p className="mt-1 text-sm text-gray-500">
+      <div className="flex max-w-[640px] flex-col gap-2">
+        <p className={labelClass}>Integrations</p>
+        <h1 className="text-[34px] font-light leading-[1.1] tracking-tight text-text-primary">Webhooks</h1>
+        <p className="text-[15px] text-text-secondary">
           Notify agents or other systems by POSTing a JSON payload whenever chosen events happen.
         </p>
       </div>
       <NewWebhookForm onCreated={load} />
-      <div className="flex flex-col gap-3">
+      <div className="flex max-w-[900px] flex-col gap-3">
+        <p className={labelClass}>Registered</p>
         {loading ? (
-          <p className="text-xs text-gray-400">Loading…</p>
+          <p className="text-xs text-text-muted">Loading…</p>
         ) : webhooks.length === 0 ? (
-          <p className="text-xs text-gray-400">No webhooks registered yet.</p>
+          <p className="text-xs text-text-muted">No webhooks registered yet.</p>
         ) : (
-          webhooks.map((w) => <WebhookRow key={w.id} webhook={w} onChanged={load} />)
+          <div className="overflow-hidden rounded-2xl border border-border bg-surface-1">
+            {webhooks.map((w) => (
+              <WebhookRow key={w.id} webhook={w} onChanged={load} />
+            ))}
+          </div>
         )}
       </div>
     </div>

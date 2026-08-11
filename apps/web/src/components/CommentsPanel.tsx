@@ -18,40 +18,40 @@ function CommentThread({
 
   return (
     <div
-      className={`rounded-md border p-2 text-xs ${
-        comment.resolved ? "border-gray-200 bg-gray-50 opacity-60" : "border-gray-300 bg-white"
+      className={`rounded-xl border p-4 text-xs ${
+        comment.resolved ? "border-border bg-surface-2 opacity-60" : "border-border-strong bg-surface-1"
       }`}
     >
       {comment.anchorOffset !== null &&
         (comment.anchorStale ? (
           <div
-            className="mb-1 inline-block rounded bg-gray-100 px-1.5 py-0.5 text-[11px] text-gray-500"
+            className="mb-1.5 inline-block rounded-full bg-surface-3 px-2 py-0.5 text-[11px] text-text-secondary"
             title="The text this comment referred to has been edited or removed since"
           >
             text changed since this comment
           </div>
         ) : (
-          <div className="mb-1 inline-block rounded bg-amber-50 px-1.5 py-0.5 text-[11px] text-amber-700">
+          <div className="mb-1.5 inline-block rounded-full bg-accent-soft px-2 py-0.5 text-[11px] text-accent-text">
             anchored on preview
           </div>
         ))}
-      <p className="text-gray-800">{comment.body}</p>
-      <div className="mt-1 flex items-center gap-2 text-[11px] text-gray-400">
+      <p className="text-[13px] text-text-primary">{comment.body}</p>
+      <div className="mt-2 flex items-center gap-2.5 text-[11px] text-text-muted">
         <span>{new Date(comment.createdAt).toLocaleString()}</span>
-        <button onClick={() => onResolve(comment)} className="text-blue-600 hover:underline">
+        <button onClick={() => onResolve(comment)} className="font-medium text-accent-text hover:underline">
           {comment.resolved ? "Unresolve" : "Resolve"}
         </button>
       </div>
-      <div className="mt-2 flex flex-col gap-2 border-l-2 border-gray-100 pl-2">
+      <div className="mt-3 flex flex-col gap-2.5 border-l-2 border-border pl-3">
         {replies.map((r) => (
-          <div key={r.id} className="text-gray-700">
-            <p>{r.body}</p>
-            <span className="text-[11px] text-gray-400">{new Date(r.createdAt).toLocaleString()}</span>
+          <div key={r.id} className="text-text-secondary">
+            <p className="text-[13px]">{r.body}</p>
+            <span className="text-[11px] text-text-muted">{new Date(r.createdAt).toLocaleString()}</span>
           </div>
         ))}
-        <div className="flex gap-1">
+        <div className="flex gap-1.5">
           <input
-            className="flex-1 rounded border border-gray-200 px-1.5 py-1 text-[11px]"
+            className="flex-1 rounded-lg border border-border bg-surface-2 px-2.5 py-1.5 text-[11px] outline-none focus:border-accent"
             placeholder="Reply…"
             value={replyText}
             onChange={(e) => setReplyText(e.target.value)}
@@ -64,7 +64,7 @@ function CommentThread({
                 setReplyText("");
               }
             }}
-            className="rounded bg-gray-100 px-2 text-[11px] text-gray-700 hover:bg-gray-200"
+            className="rounded-full bg-surface-3 px-3 text-[11px] font-medium text-text-secondary hover:bg-border-strong"
           >
             Reply
           </button>
@@ -108,43 +108,40 @@ export function CommentsPanel({
   const repliesOf = (id: string) => comments.filter((c) => c.parentCommentId === id);
 
   return (
-    <div>
-      <p className="mb-3 text-xs text-gray-500">
+    <div className="max-w-[720px]">
+      <p className="mb-3.5 text-xs text-text-muted">
         Select text in the LinkedIn preview above to leave a comment anchored to it.
       </p>
 
       {!generalOpen ? (
-        <button
-          onClick={() => setGeneralOpen(true)}
-          className="mb-3 text-xs text-gray-500 hover:text-gray-700 hover:underline"
-        >
+        <button onClick={() => setGeneralOpen(true)} className="mb-3.5 text-xs text-text-secondary hover:text-text-primary hover:underline">
           + Add a general comment
         </button>
       ) : (
-        <div className="mb-3">
+        <div className="mb-3.5">
           <textarea
             autoFocus
             rows={2}
-            className="w-full rounded-md border border-gray-300 p-2 text-xs"
+            className="w-full rounded-xl border border-border bg-surface-2 p-3 text-xs outline-none focus:border-accent"
             placeholder="General comment (not tied to a specific selection)…"
             value={generalText}
             onChange={(e) => setGeneralText(e.target.value)}
             maxLength={MAX_COMMENT_BODY_LENGTH}
           />
-          <div className="mt-1 flex justify-end gap-1">
+          <div className="mt-1.5 flex justify-end gap-1.5">
             <button
               onClick={() => {
                 setGeneralOpen(false);
                 setGeneralText("");
               }}
-              className="rounded px-2 py-1 text-[11px] text-gray-600 hover:bg-gray-100"
+              className="rounded-full px-3 py-1.5 text-[11px] text-text-secondary hover:bg-surface-2"
             >
               Cancel
             </button>
             <button
               onClick={submitGeneral}
               disabled={!generalText.trim()}
-              className="rounded bg-gray-900 px-2 py-1 text-[11px] text-white disabled:opacity-40"
+              className="rounded-full bg-accent px-3 py-1.5 text-[11px] font-semibold text-white disabled:opacity-40"
             >
               Post
             </button>
@@ -153,7 +150,7 @@ export function CommentsPanel({
       )}
 
       {roots.length === 0 ? (
-        <p className="text-xs text-gray-400">No comments yet.</p>
+        <p className="text-xs text-text-muted">No comments yet.</p>
       ) : (
         <div className="flex flex-col gap-3">
           {roots.map((c) => (

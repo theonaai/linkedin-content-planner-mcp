@@ -38,14 +38,14 @@ export function ScheduleDialog({
 
   return (
     <Modal title={currentDate ? "Edit schedule" : "Schedule post"} onClose={onClose}>
-      <label className="mb-1 block text-xs font-medium text-gray-500" htmlFor="schedule-date-input">
+      <label className="mb-2 block text-[11px] font-medium uppercase tracking-[0.14em] text-text-muted" htmlFor="schedule-date-input">
         Publish date
       </label>
       <input
         id="schedule-date-input"
         type="date"
         autoFocus
-        className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
+        className="w-full rounded-xl border border-border bg-surface-2 px-3.5 py-2.5 text-sm text-text-primary outline-none focus:border-accent focus:bg-surface-1 focus:ring-4 focus:ring-accent-soft"
         value={date}
         onChange={(e) => setDate(e.target.value)}
       />
@@ -55,7 +55,7 @@ export function ScheduleDialog({
           <button
             onClick={handleRemove}
             disabled={busy}
-            className="text-sm text-red-600 hover:underline disabled:opacity-40"
+            className="text-sm font-medium text-accent-text hover:underline disabled:opacity-40"
           >
             Remove schedule
           </button>
@@ -66,14 +66,14 @@ export function ScheduleDialog({
           <button
             onClick={onClose}
             disabled={busy}
-            className="rounded-md border border-gray-300 px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-50"
+            className="rounded-full border border-border-strong px-3.5 py-1.5 text-sm text-text-primary hover:bg-surface-2"
           >
             Cancel
           </button>
           <button
             onClick={handleSave}
             disabled={busy || !date}
-            className="rounded-md bg-gray-900 px-3 py-1.5 text-sm font-medium text-white disabled:opacity-40"
+            className="rounded-full bg-accent px-3.5 py-1.5 text-sm font-semibold text-white hover:bg-accent-hover disabled:opacity-40"
           >
             {currentDate ? "Save" : "Schedule post"}
           </button>

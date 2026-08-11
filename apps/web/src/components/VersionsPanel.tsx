@@ -48,8 +48,8 @@ export function VersionsPanel({
   const ordered = versions.slice().reverse();
 
   return (
-    <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-      <div className="flex flex-col gap-2">
+    <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
+      <div className="flex flex-col gap-2.5">
         {ordered.map((v, idx) => {
           const isLatest = idx === 0;
           const isSelected = v.id === selectedVersionId;
@@ -57,17 +57,17 @@ export function VersionsPanel({
             <div
               key={v.id}
               onClick={() => onSelectVersion(v.id)}
-              className={`cursor-pointer rounded-md border px-3 py-2 text-left text-xs ${
-                isSelected ? "border-gray-900 bg-gray-50" : "border-gray-200 hover:bg-gray-50"
+              className={`flex cursor-pointer flex-col gap-1.5 rounded-xl border px-4 py-3.5 text-left ${
+                isSelected ? "border-accent bg-accent-soft" : "border-border hover:bg-surface-2"
               }`}
             >
-              <div className="flex items-center justify-between">
-                <span className="font-medium text-gray-700">
-                  Version {versions.length - idx} {isLatest && "(latest)"}
+              <div className="flex items-center justify-between gap-3">
+                <span className="text-[13px] font-semibold text-text-primary">
+                  Version {versions.length - idx} {isLatest && <span className="font-medium text-accent-text">(latest)</span>}
                 </span>
-                <span className="text-gray-400">{new Date(v.createdAt).toLocaleString()}</span>
+                <span className="text-[11px] text-text-muted">{new Date(v.createdAt).toLocaleString()}</span>
               </div>
-              <p className="mt-1 truncate text-gray-500">{v.contentMarkdown.split("\n")[0] || "(empty)"}</p>
+              <p className="truncate text-xs text-text-secondary">{v.contentMarkdown.split("\n")[0] || "(empty)"}</p>
               {!isLatest && (
                 <button
                   onClick={(e) => {
@@ -75,7 +75,7 @@ export function VersionsPanel({
                     handleRevert(v.id);
                   }}
                   disabled={reverting === v.id}
-                  className="mt-1 text-[11px] text-blue-600 hover:underline disabled:opacity-40"
+                  className="self-start text-xs font-medium text-accent-text hover:underline disabled:opacity-40"
                 >
                   {reverting === v.id ? "Reverting…" : "Revert to this version"}
                 </button>
@@ -84,8 +84,8 @@ export function VersionsPanel({
           );
         })}
       </div>
-      <div>
-        <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-400">
+      <div className="flex flex-col gap-3">
+        <p className="text-[11px] font-medium uppercase tracking-[0.14em] text-text-muted">
           {previous ? "Diff vs previous version" : "First version — nothing to diff"}
         </p>
         {diffError && <p className="text-xs text-red-600">{diffError}</p>}

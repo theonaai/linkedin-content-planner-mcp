@@ -134,7 +134,7 @@ export function PostDetailView() {
     }
   }
 
-  if (loading) return <p className="text-sm text-gray-500">Loading…</p>;
+  if (loading) return <p className="text-sm text-text-muted">Loading…</p>;
   if (!post) return <p className="text-sm text-red-600">{error ?? "Post not found"}</p>;
 
   const latestVersion = versions[versions.length - 1];
@@ -146,121 +146,121 @@ export function PostDetailView() {
   const unresolvedCount = comments.filter((c) => !c.parentCommentId && !c.resolved).length;
 
   return (
-    <div>
-      <div className="mb-4 flex items-center justify-between">
-        <Link to="/" className="inline-block text-sm text-gray-500 hover:underline">
+    <div className="flex flex-col gap-5">
+      <div className="flex items-center justify-between">
+        <Link to="/" className="inline-block text-sm text-text-secondary hover:text-text-primary">
           ← Back to backlog
         </Link>
-        <button
-          onClick={() => setDeleteDialogOpen(true)}
-          className="text-sm text-red-600 hover:underline"
-        >
+        <button onClick={() => setDeleteDialogOpen(true)} className="text-sm font-medium text-accent-text hover:underline">
           Delete post
         </button>
       </div>
 
-      <div className="rounded-lg bg-white p-4 shadow-sm">
-        <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
-          <div className="flex items-center gap-2">
-            <StateBadge state={post.state} />
-            <span className="text-xs text-gray-400">{post.platform}</span>
-          </div>
-          {post.scheduledDate ? (
-            <div className="flex items-center gap-2 rounded-full bg-emerald-50 py-1 pl-3 pr-1 text-sm text-emerald-800">
-              <span>📅 Scheduled for {formatDateDisplay(post.scheduledDate)}</span>
+      <div className="flex flex-col gap-5 rounded-2xl border border-border bg-surface-1 p-6 shadow-card">
+        <div className="flex flex-wrap items-start justify-between gap-6">
+          <div className="flex flex-col gap-3.5">
+            <div className="flex items-center gap-2.5">
+              <StateBadge state={post.state} />
+              <span className="rounded-full border border-border bg-surface-2 px-2.5 py-1 text-xs font-medium text-text-secondary">
+                {post.platform}
+              </span>
+            </div>
+            {post.scheduledDate ? (
+              <div className="flex items-center gap-2 self-start rounded-full bg-accent-soft py-1.5 pl-4 pr-1.5 text-sm text-accent-text">
+                <span>📅 Scheduled for {formatDateDisplay(post.scheduledDate)}</span>
+                <button
+                  onClick={() => setScheduleDialogOpen(true)}
+                  className="rounded-full px-2.5 py-1 text-xs font-semibold text-accent-text hover:bg-white/50"
+                >
+                  Edit
+                </button>
+              </div>
+            ) : (
               <button
                 onClick={() => setScheduleDialogOpen(true)}
-                className="rounded-full px-2 py-0.5 text-xs font-medium text-emerald-700 hover:bg-emerald-100"
+                className="self-start rounded-full border border-border-strong bg-surface-1 px-4 py-2 text-[13px] font-medium text-text-primary hover:bg-surface-2"
               >
-                Edit
+                📅 Schedule post
               </button>
+            )}
+          </div>
+          {NEXT_STATES[post.state].length > 0 && (
+            <div className="flex flex-wrap items-center justify-end gap-2">
+              {NEXT_STATES[post.state].map((next) => {
+                const blocked = next === "in_review" && unresolvedCount > 0;
+                return (
+                  <button
+                    key={next}
+                    onClick={() => handleTransition(next)}
+                    disabled={blocked}
+                    title={blocked ? `Resolve ${unresolvedCount} open comment(s) first` : undefined}
+                    className="rounded-full border border-border-strong bg-surface-1 px-4 py-2 text-[13px] font-medium text-text-primary hover:bg-surface-2 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-surface-1"
+                  >
+                    Move to {STATE_LABELS[next]} →
+                  </button>
+                );
+              })}
             </div>
-          ) : (
-            <button
-              onClick={() => setScheduleDialogOpen(true)}
-              className="rounded-md border border-gray-300 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50"
-            >
-              📅 Schedule post
-            </button>
           )}
         </div>
 
-        {error && <p className="mb-3 text-sm text-red-600">{error}</p>}
-
-        {NEXT_STATES[post.state].length > 0 && (
-          <div className="mb-4 flex flex-wrap items-center gap-2">
-            {NEXT_STATES[post.state].map((next) => {
-              const blocked = next === "in_review" && unresolvedCount > 0;
-              return (
-                <button
-                  key={next}
-                  onClick={() => handleTransition(next)}
-                  disabled={blocked}
-                  title={blocked ? `Resolve ${unresolvedCount} open comment(s) first` : undefined}
-                  className="rounded-md border border-gray-300 px-3 py-1 text-sm text-gray-700 hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent"
-                >
-                  Move to {STATE_LABELS[next]}
-                </button>
-              );
-            })}
-            {NEXT_STATES[post.state].includes("in_review") && unresolvedCount > 0 && (
-              <span className="text-xs text-amber-600">
-                Resolve {unresolvedCount} open comment{unresolvedCount === 1 ? "" : "s"} before submitting for review.
-              </span>
-            )}
-          </div>
+        {error && <p className="text-sm text-red-600">{error}</p>}
+        {NEXT_STATES[post.state].includes("in_review") && unresolvedCount > 0 && (
+          <p className="-mt-3 text-xs text-accent-text">
+            Resolve {unresolvedCount} open comment{unresolvedCount === 1 ? "" : "s"} before submitting for review.
+          </p>
         )}
 
-        <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-          <div>
+        <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+          <div className="flex flex-col gap-3.5">
+            <p className="text-[11px] font-medium uppercase tracking-[0.14em] text-text-muted">Draft</p>
             <textarea
               ref={textareaRef}
-              className="min-h-32 w-full resize-none overflow-hidden rounded-md border border-gray-300 p-3 font-mono text-sm"
+              className="min-h-32 w-full resize-none overflow-hidden rounded-xl border border-border bg-surface-2 p-5 font-mono text-sm leading-relaxed text-text-primary outline-none focus:border-accent focus:bg-surface-1 focus:ring-4 focus:ring-accent-soft"
               value={draft}
               onChange={(e) => setDraft(e.target.value)}
               placeholder="Draft content (markdown subset: **bold**, *italic*, bullets)…"
               maxLength={MAX_CONTENT_LENGTH}
             />
-            <div className="mt-3 flex items-center gap-3">
+            <div className="flex items-center gap-4">
               <button
                 onClick={handleSaveDraft}
                 disabled={!dirty || saving}
-                className="rounded-md bg-gray-900 px-4 py-2 text-sm font-medium text-white disabled:opacity-40"
+                className="rounded-full bg-accent px-5 py-2.5 text-[13px] font-semibold text-white hover:bg-accent-hover disabled:opacity-40"
               >
                 {saving ? "Saving…" : "Save as new version"}
               </button>
-              <span className="text-xs text-gray-400">{versions.length} version(s)</span>
+              <span className="text-xs text-text-muted">{versions.length} version(s)</span>
+              <div className="flex-1" />
               <span
-                className={`text-xs ${
-                  draft.length > MAX_CONTENT_LENGTH * 0.95 ? "text-amber-600" : "text-gray-400"
+                className={`text-xs tabular-nums ${
+                  draft.length > MAX_CONTENT_LENGTH * 0.95 ? "text-accent-text" : "text-text-muted"
                 }`}
               >
                 {draft.length.toLocaleString()} / {MAX_CONTENT_LENGTH.toLocaleString()}
               </span>
             </div>
           </div>
-          <div>
-            <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-400">
+          <div className="flex flex-col gap-3.5">
+            <p className="text-[11px] font-medium uppercase tracking-[0.14em] text-text-muted">
               LinkedIn preview {commentable && "— select text to comment on it"}
             </p>
-            {dirty && (
-              <p className="mb-2 text-xs text-amber-600">Save your draft to enable commenting on it.</p>
-            )}
+            {dirty && <p className="text-xs text-accent-text">Save your draft to enable commenting on it.</p>}
             <LinkedInPreview content={draft} commentable={commentable} />
           </div>
         </div>
       </div>
 
-      <div className="mt-4 rounded-lg bg-white p-4 shadow-sm">
-        <div className="mb-4 flex gap-1 border-b border-gray-200">
+      <div className="rounded-2xl border border-border bg-surface-1 shadow-card">
+        <div className="flex items-center gap-1 border-b border-border px-6">
           {TABS.map((t) => (
             <button
               key={t.id}
               onClick={() => setTab(t.id)}
-              className={`px-3 py-2 text-sm font-medium ${
+              className={`-mb-px border-b-2 px-3.5 py-4 text-sm ${
                 tab === t.id
-                  ? "border-b-2 border-gray-900 text-gray-900"
-                  : "text-gray-500 hover:text-gray-700"
+                  ? "border-accent font-semibold text-text-primary"
+                  : "border-transparent font-medium text-text-muted hover:text-text-secondary"
               }`}
             >
               {t.label}
@@ -268,6 +268,7 @@ export function PostDetailView() {
           ))}
         </div>
 
+        <div className="p-6">
         {tab === "versions" && (
           <VersionsPanel
             postId={post.id}
@@ -282,6 +283,7 @@ export function PostDetailView() {
         )}
         {tab === "reviews" && <ReviewsPanel postId={post.id} postState={post.state} onReviewed={load} />}
         {tab === "attachments" && <AttachmentsPanel postId={post.id} />}
+        </div>
       </div>
 
       {scheduleDialogOpen && (
@@ -295,7 +297,7 @@ export function PostDetailView() {
 
       {deleteDialogOpen && (
         <Modal title="Delete post" onClose={() => setDeleteDialogOpen(false)}>
-          <p className="text-sm text-gray-700">
+          <p className="text-sm text-text-secondary">
             This permanently deletes the post, every version, all comments and reviews, and any
             attachments. This can&apos;t be undone.
           </p>
@@ -303,14 +305,14 @@ export function PostDetailView() {
             <button
               onClick={() => setDeleteDialogOpen(false)}
               disabled={deleting}
-              className="rounded-md border border-gray-300 px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-50"
+              className="rounded-full border border-border-strong px-4 py-2 text-[13px] font-medium text-text-primary hover:bg-surface-2"
             >
               Cancel
             </button>
             <button
               onClick={handleDelete}
               disabled={deleting}
-              className="rounded-md bg-red-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-red-700 disabled:opacity-40"
+              className="rounded-full bg-red-600 px-4 py-2 text-[13px] font-semibold text-white hover:bg-red-700 disabled:opacity-40"
             >
               {deleting ? "Deleting…" : "Delete permanently"}
             </button>

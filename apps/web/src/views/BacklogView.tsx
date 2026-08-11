@@ -2,13 +2,16 @@ import { useState } from "react";
 import { Link } from "react-router-dom";
 import { api } from "../lib/api.js";
 import { usePostsWithSnippets, type PostWithSnippet } from "../lib/usePostsWithSnippets.js";
-import { NEXT_STATES, STATE_BORDER_CLASSES, STATE_LABELS } from "../lib/stateMachine.js";
+import { NEXT_STATES, STATE_CARD_CLASSES, STATE_COLORS, STATE_LABELS } from "../lib/stateMachine.js";
 import type { PostState } from "../lib/types.js";
 
 // Active-pipeline states get the kanban board; backlog and posted can accumulate a lot of
 // posts over time (an unprocessed idea pile, a full publish history), so they get compact
 // scrollable lists below instead of columns that would grow unboundedly tall.
 const KANBAN_STATES: PostState[] = ["todo", "in_progress", "in_review", "ready"];
+
+const moveButtonClass =
+  "rounded-full border border-border bg-surface-1 px-2.5 py-1 text-[11px] font-medium text-text-secondary hover:border-accent hover:text-accent-text";
 
 export function BacklogView() {
   const { posts, loading, error, reload } = usePostsWithSnippets();
@@ -45,10 +48,10 @@ export function BacklogView() {
     .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
 
   return (
-    <div>
-      <form onSubmit={handleCreate} className="mb-6 flex gap-2">
+    <div className="flex flex-col gap-7">
+      <form onSubmit={handleCreate} className="flex items-center gap-3">
         <input
-          className="flex-1 rounded-md border border-gray-300 px-3 py-2 text-sm"
+          className="flex-1 rounded-xl border border-border bg-surface-1 px-4.5 py-3.5 text-[15px] text-text-primary outline-none focus:border-accent focus:ring-4 focus:ring-accent-soft"
           placeholder="New post idea… (adds to backlog)"
           value={newIdea}
           onChange={(e) => setNewIdea(e.target.value)}
@@ -56,43 +59,46 @@ export function BacklogView() {
         <button
           type="submit"
           disabled={creating || !newIdea.trim()}
-          className="rounded-md bg-gray-900 px-4 py-2 text-sm font-medium text-white disabled:opacity-40"
+          className="rounded-full bg-accent px-7 py-3.5 text-sm font-semibold text-white hover:bg-accent-hover disabled:opacity-40"
         >
-          Add
+          Add idea
         </button>
       </form>
 
-      {error && <p className="mb-4 text-sm text-red-600">{error}</p>}
+      {error && <p className="text-sm text-red-600">{error}</p>}
       {loading ? (
-        <p className="text-sm text-gray-500">Loading…</p>
+        <p className="text-sm text-text-muted">Loading…</p>
       ) : (
         <>
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
             {columns.map(({ state, posts: statePosts }) => (
-              <div key={state} className="rounded-lg bg-white p-3 shadow-sm">
-                <h2 className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-500">
-                  {STATE_LABELS[state]} <span className="text-gray-400">({statePosts.length})</span>
-                </h2>
+              <div key={state} className="flex min-h-[190px] flex-col gap-3 rounded-2xl border border-border bg-surface-1 p-4">
+                <div className="flex items-center justify-between">
+                  <span className={`text-[11px] font-semibold uppercase tracking-[0.14em] ${STATE_COLORS[state].label}`}>
+                    {STATE_LABELS[state]}
+                  </span>
+                  <span className="rounded-full bg-surface-3 px-2 py-0.5 text-[11px] font-semibold text-text-muted">
+                    {statePosts.length}
+                  </span>
+                </div>
                 <div className="flex flex-col gap-2">
                   {statePosts.map((post) => (
                     <div
                       key={post.id}
-                      className={`rounded-md border border-l-4 border-gray-200 p-2 ${STATE_BORDER_CLASSES[state]}`}
+                      className={`flex flex-col gap-2.5 rounded-lg border border-l-[3px] p-3 ${STATE_CARD_CLASSES[state]}`}
                     >
-                      <Link to={`/posts/${post.id}`} className="block text-sm text-gray-900 hover:underline">
-                        {post.snippet || <span className="italic text-gray-400">(empty)</span>}
+                      <Link to={`/posts/${post.id}`} className="flex flex-col gap-1">
+                        <span className="text-[13px] font-medium leading-snug text-text-primary">
+                          {post.snippet || <span className="italic text-text-muted">(empty)</span>}
+                        </span>
+                        {post.scheduledDate && (
+                          <span className="text-[11px] tabular-nums text-text-muted">{post.scheduledDate}</span>
+                        )}
                       </Link>
-                      {post.scheduledDate && (
-                        <div className="mt-1 text-xs text-gray-500">{post.scheduledDate}</div>
-                      )}
                       {NEXT_STATES[state].length > 0 && (
-                        <div className="mt-2 flex flex-wrap gap-1">
+                        <div className="flex flex-wrap gap-1.5">
                           {NEXT_STATES[state].map((next) => (
-                            <button
-                              key={next}
-                              onClick={() => advance(post.id, next)}
-                              className="rounded border border-gray-300 px-1.5 py-0.5 text-[11px] text-gray-600 hover:bg-gray-100"
-                            >
+                            <button key={next} onClick={() => advance(post.id, next)} className={moveButtonClass}>
                               → {STATE_LABELS[next]}
                             </button>
                           ))}
@@ -105,9 +111,9 @@ export function BacklogView() {
             ))}
           </div>
 
-          <div className="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-2">
+          <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
             <PostListSection title="Backlog" posts={backlogPosts} onAdvance={advance} />
-            <PostListSection title="Posted" posts={postedPosts} onAdvance={advance} />
+            <PostListSection title="Posted" posts={postedPosts} onAdvance={advance} posted />
           </div>
         </>
       )}
@@ -119,36 +125,43 @@ function PostListSection({
   title,
   posts,
   onAdvance,
+  posted = false,
 }: {
   title: string;
   posts: PostWithSnippet[];
   onAdvance: (postId: string, toState: PostState) => void;
+  posted?: boolean;
 }) {
   return (
-    <div className="rounded-lg bg-white p-3 shadow-sm">
-      <h2 className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-500">
-        {title} <span className="text-gray-400">({posts.length})</span>
-      </h2>
+    <div className="flex flex-col gap-3.5 rounded-2xl border border-border bg-surface-1 p-5">
+      <div className="flex items-center justify-between">
+        <span className="text-[11px] font-medium uppercase tracking-[0.14em] text-text-muted">{title}</span>
+        <span className="rounded-full bg-surface-3 px-2 py-0.5 text-[11px] font-semibold text-text-muted">
+          {posts.length}
+        </span>
+      </div>
       {posts.length === 0 ? (
-        <p className="text-xs text-gray-400">Nothing here.</p>
+        <p className="text-xs text-text-muted">Nothing here.</p>
       ) : (
-        <div className="flex max-h-80 flex-col divide-y divide-gray-100 overflow-y-auto">
+        <div className="flex max-h-80 flex-col gap-2 overflow-y-auto">
           {posts.map((post) => (
-            <div key={post.id} className="flex items-center justify-between gap-3 py-2">
-              <Link
-                to={`/posts/${post.id}`}
-                className="min-w-0 flex-1 truncate text-sm text-gray-900 hover:underline"
-              >
-                {post.snippet || <span className="italic text-gray-400">(empty)</span>}
+            <div
+              key={post.id}
+              className={
+                posted
+                  ? `flex items-center justify-between gap-4 rounded-lg border border-l-[3px] px-3.5 py-3 ${STATE_CARD_CLASSES.posted}`
+                  : "flex items-center justify-between gap-4 rounded-lg border border-border bg-surface-2 px-3.5 py-3 hover:border-border-strong hover:bg-surface-1"
+              }
+            >
+              <Link to={`/posts/${post.id}`} className="min-w-0 flex-1 truncate text-[13px] text-text-primary">
+                {post.snippet || <span className="italic text-text-muted">(empty)</span>}
               </Link>
-              <div className="flex shrink-0 items-center gap-2">
-                {post.scheduledDate && <span className="text-xs text-gray-400">{post.scheduledDate}</span>}
+              <div className="flex shrink-0 items-center gap-2.5">
+                {post.scheduledDate && (
+                  <span className="whitespace-nowrap text-[11px] tabular-nums text-text-muted">{post.scheduledDate}</span>
+                )}
                 {NEXT_STATES[post.state].map((next) => (
-                  <button
-                    key={next}
-                    onClick={() => onAdvance(post.id, next)}
-                    className="rounded border border-gray-300 px-1.5 py-0.5 text-[11px] text-gray-600 hover:bg-gray-100"
-                  >
+                  <button key={next} onClick={() => onAdvance(post.id, next)} className={moveButtonClass}>
                     → {STATE_LABELS[next]}
                   </button>
                 ))}

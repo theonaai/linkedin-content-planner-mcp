@@ -54,50 +54,49 @@ export function AttachmentsPanel({ postId }: { postId: string }) {
     }
   }
 
+  const browseButton = (
+    <button
+      onClick={() => fileInputRef.current?.click()}
+      disabled={uploading}
+      className="rounded-full border border-border-strong bg-surface-1 px-4 py-2 text-[13px] font-medium text-text-primary hover:bg-surface-2 disabled:opacity-40"
+    >
+      {uploading ? "Uploading…" : "Browse files"}
+    </button>
+  );
+
   return (
     <div>
-      <div className="mb-3 flex items-center gap-3">
-        <input
-          ref={fileInputRef}
-          type="file"
-          onChange={handleFileChange}
-          disabled={uploading}
-          className="hidden"
-        />
-        <button
-          onClick={() => fileInputRef.current?.click()}
-          disabled={uploading}
-          className="flex items-center gap-1.5 rounded-md border border-gray-300 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-40"
-        >
-          📎 {uploading ? "Uploading…" : "Attach file"}
-        </button>
-        <span className="text-xs text-gray-400">Carousels, images, PDFs — up to 25 MB</span>
-      </div>
-      {error && <p className="mb-2 text-xs text-red-600">{error}</p>}
+      <input ref={fileInputRef} type="file" onChange={handleFileChange} disabled={uploading} className="hidden" />
+      {error && <p className="mb-2.5 text-xs text-red-600">{error}</p>}
       {loading ? (
-        <p className="text-xs text-gray-400">Loading…</p>
+        <p className="text-xs text-text-muted">Loading…</p>
       ) : attachments.length === 0 ? (
-        <p className="text-xs text-gray-400">No attachments yet. Click “Attach file” to add one.</p>
+        <div className="flex flex-col items-center gap-3 rounded-xl border border-dashed border-border-strong bg-surface-2 py-11">
+          <p className="text-sm text-text-secondary">No attachments yet — drop an image, carousel or video here.</p>
+          {browseButton}
+          <span className="text-xs text-text-muted">Carousels, images, PDFs — up to 25 MB</span>
+        </div>
       ) : (
-        <div className="flex flex-col gap-2">
+        <div className="flex flex-col gap-2.5">
+          <div className="flex items-center gap-3">
+            {browseButton}
+            <span className="text-xs text-text-muted">Carousels, images, PDFs — up to 25 MB</span>
+          </div>
           {attachments.map((a) => (
-            <div
-              key={a.id}
-              className="flex items-center justify-between rounded-md border border-gray-200 px-3 py-2 text-sm"
-            >
+            <div key={a.id} className="flex items-center justify-between rounded-xl border border-border px-4 py-3 text-sm">
               <div>
                 <a
                   href={attachmentsApi.downloadUrl(a.id)}
-                  className="font-medium text-gray-900 hover:underline"
+                  className="font-medium text-text-primary hover:underline"
                   download={a.filename}
                 >
                   {a.filename}
                 </a>
-                <p className="text-xs text-gray-400">
+                <p className="text-xs text-text-muted">
                   {a.mimeType} · {formatBytes(a.sizeBytes)}
                 </p>
               </div>
-              <button onClick={() => handleDelete(a.id)} className="text-xs text-red-600 hover:underline">
+              <button onClick={() => handleDelete(a.id)} className="text-xs font-medium text-accent-text hover:underline">
                 Remove
               </button>
             </div>

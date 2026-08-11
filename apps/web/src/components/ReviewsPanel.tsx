@@ -51,56 +51,64 @@ export function ReviewsPanel({
   }
 
   return (
-    <div>
+    <div className="max-w-[720px]">
       {postState === "in_review" && (
-        <div className="mb-4 rounded-md border border-purple-200 bg-purple-50 p-3">
-          <p className="mb-2 text-xs font-semibold text-purple-800">Review this post</p>
+        <div className="mb-5 rounded-xl border border-[rgba(229,81,43,0.25)] bg-accent-soft p-4">
+          <p className="mb-2.5 text-xs font-semibold text-accent-text">Review this post</p>
           <textarea
-            className="mb-2 w-full rounded-md border border-gray-300 p-2 text-sm"
+            className="mb-2.5 w-full rounded-lg border border-border bg-surface-1 p-2.5 text-sm outline-none focus:border-accent"
             rows={2}
             placeholder="Note (required if requesting changes)…"
             value={decisionBody}
             onChange={(e) => setDecisionBody(e.target.value)}
             maxLength={MAX_REVIEW_BODY_LENGTH}
           />
-          {error && <p className="mb-2 text-xs text-red-600">{error}</p>}
+          {error && <p className="mb-2.5 text-xs text-red-600">{error}</p>}
           <div className="flex gap-2">
             <button
               onClick={() => decide("approved")}
               disabled={submitting}
-              className="rounded-md bg-emerald-600 px-3 py-1.5 text-xs font-medium text-white disabled:opacity-40"
+              className="rounded-full bg-accent px-4 py-2 text-xs font-semibold text-white hover:bg-accent-hover disabled:opacity-40"
             >
               Approve
             </button>
             <button
               onClick={() => decide("changes_requested")}
               disabled={submitting}
-              className="rounded-md bg-amber-600 px-3 py-1.5 text-xs font-medium text-white disabled:opacity-40"
+              className="rounded-full border border-border-strong bg-surface-1 px-4 py-2 text-xs font-medium text-text-primary hover:bg-surface-2 disabled:opacity-40"
             >
               Request changes
             </button>
           </div>
         </div>
       )}
-      <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-400">Review history</p>
+      <p className="mb-2.5 text-[11px] font-medium uppercase tracking-[0.14em] text-text-muted">Review history</p>
       {loading ? (
-        <p className="text-xs text-gray-400">Loading…</p>
+        <p className="text-xs text-text-muted">Loading…</p>
       ) : reviews.length === 0 ? (
-        <p className="text-xs text-gray-400">No reviews yet.</p>
+        <p className="text-xs text-text-muted">No reviews yet.</p>
       ) : (
-        <div className="flex flex-col gap-2">
+        <div className="flex flex-col gap-2.5">
           {reviews.map((r) => (
-            <div
-              key={r.id}
-              className={`rounded-md border p-2 text-xs ${
-                r.decision === "approved" ? "border-emerald-200 bg-emerald-50" : "border-amber-200 bg-amber-50"
-              }`}
-            >
-              <div className="flex items-center justify-between">
-                <span className="font-medium">{r.decision === "approved" ? "Approved" : "Changes requested"}</span>
-                <span className="text-gray-400">{new Date(r.createdAt).toLocaleString()}</span>
+            <div key={r.id} className="flex items-center justify-between gap-4 rounded-xl border border-border p-4 text-xs">
+              <div className="flex flex-col gap-1">
+                <span className="font-semibold text-text-primary">
+                  {r.decision === "approved" ? "Approved" : "Changes requested"}
+                </span>
+                {r.body && <p className="text-text-secondary">{r.body}</p>}
               </div>
-              {r.body && <p className="mt-1 text-gray-700">{r.body}</p>}
+              <div className="flex shrink-0 flex-col items-end gap-1.5">
+                <span
+                  className={`rounded-full px-2.5 py-1 text-[11px] font-medium ${
+                    r.decision === "approved"
+                      ? "border border-border bg-surface-2 text-text-secondary"
+                      : "border border-[rgba(229,81,43,0.25)] bg-accent-soft text-accent-text"
+                  }`}
+                >
+                  {r.decision === "approved" ? "Approved" : "Changes requested"}
+                </span>
+                <span className="text-text-muted">{new Date(r.createdAt).toLocaleString()}</span>
+              </div>
             </div>
           ))}
         </div>

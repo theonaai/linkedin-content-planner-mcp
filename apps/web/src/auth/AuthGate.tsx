@@ -9,7 +9,7 @@ export function AuthGate({ children }: { children: ReactNode }) {
   const { status } = useAuth();
 
   if (status.kind === "loading") {
-    return <div className="flex min-h-screen items-center justify-center text-sm text-gray-400">Loading…</div>;
+    return <div className="flex min-h-screen items-center justify-center bg-bg text-sm text-text-muted">Loading…</div>;
   }
   if (status.kind === "unauthenticated") {
     return <LoginScreen />;
