@@ -19,13 +19,52 @@ export interface AuthEnv {
   mcpOauthCookieKeys: string[];
 }
 
+export interface S3StorageEnv {
+  driver: "s3";
+  bucket: string;
+  region: string;
+  accessKeyId: string;
+  secretAccessKey: string;
+  endpoint?: string;
+  forcePathStyle: boolean;
+}
+
+export type StorageEnv = { driver: "local"; attachmentsDir: string } | S3StorageEnv;
+
 export interface Env {
   port: number;
   databaseUrl: string;
-  attachmentsDir: string;
+  storage: StorageEnv;
   /** Local dev defaults to no auth at all — every request uses the single implicit workspace,
    * exactly as before this feature existed. Only the cloud deployment sets AUTH_ENABLED=true. */
   auth: AuthEnv | { enabled: false };
+}
+
+function loadStorageEnv(): StorageEnv {
+  const driver = process.env.STORAGE_DRIVER ?? "local";
+  if (driver === "local") {
+    return { driver: "local", attachmentsDir: process.env.ATTACHMENTS_DIR ?? "./data/attachments" };
+  }
+  if (driver !== "s3") {
+    throw new Error(`Unknown STORAGE_DRIVER "${driver}" — expected "local" or "s3"`);
+  }
+
+  const required = (name: string): string => {
+    const value = process.env[name];
+    if (!value) throw new Error(`${name} is required when STORAGE_DRIVER=s3`);
+    return value;
+  };
+
+  return {
+    driver: "s3",
+    bucket: required("S3_BUCKET"),
+    region: required("S3_REGION"),
+    accessKeyId: required("S3_ACCESS_KEY_ID"),
+    secretAccessKey: required("S3_SECRET_ACCESS_KEY"),
+    // Set for R2/MinIO/any non-AWS S3-compatible provider; leave unset for real AWS S3.
+    endpoint: process.env.S3_ENDPOINT || undefined,
+    forcePathStyle: process.env.S3_FORCE_PATH_STYLE === "true",
+  };
 }
 
 function loadAuthEnv(): AuthEnv | { enabled: false } {
@@ -66,7 +105,7 @@ export function loadEnv(): Env {
   return {
     port: Number(process.env.PORT ?? 3210),
     databaseUrl,
-    attachmentsDir: process.env.ATTACHMENTS_DIR ?? "./data/attachments",
+    storage: loadStorageEnv(),
     auth: loadAuthEnv(),
   };
 }

@@ -590,4 +590,116 @@ describe.skipIf(!connectionString)("post lifecycle (integration)", () => {
       await core.webhooks.deleteWebhook(webhook.id);
     });
   });
+
+  describe("workspace invites", () => {
+    async function cleanupUser(userId: string, workspaceId: string) {
+      await db.delete(memberships).where(eq(memberships.userId, userId));
+      await db.delete(workspaces).where(eq(workspaces.id, workspaceId));
+      await db.delete(users).where(eq(users.id, userId));
+    }
+
+    it("turns a pending invite into a membership on login, then clears it", async () => {
+      const inviter = await core.users.findOrCreateUser({
+        theonaUserId: `theona-inviter-${randomUUID()}`,
+        email: "inviter@example.com",
+      });
+      const inviterMemberships = await core.users.listMemberships(inviter.id);
+      const inviterWorkspaceId = inviterMemberships[0].workspaceId;
+
+      const email = `ghostwriter-${randomUUID()}@example.com`;
+      const invite = await core.invites.createInvite({
+        workspaceId: inviterWorkspaceId,
+        email,
+        role: "member",
+        invitedByUserId: inviter.id,
+      });
+      expect(invite.role).toBe("member");
+      expect(await core.invites.listInvites(inviterWorkspaceId)).toHaveLength(1);
+
+      // The invitee logs in for the first time — findOrCreateUser gives them their own
+      // personal workspace, and consumePendingInvites should ALSO add them to the inviter's.
+      const invitee = await core.users.findOrCreateUser({ theonaUserId: `theona-invitee-${randomUUID()}`, email });
+      await core.invites.consumePendingInvites(invitee.id, email);
+
+      const inviteeMemberships = await core.users.listMemberships(invitee.id);
+      expect(inviteeMemberships).toHaveLength(2); // personal workspace + the invited one
+      expect(inviteeMemberships.map((m) => m.workspaceId)).toContain(inviterWorkspaceId);
+      const invitedMembership = inviteeMemberships.find((m) => m.workspaceId === inviterWorkspaceId)!;
+      expect(invitedMembership.role).toBe("member");
+
+      // Consumed — the invite row is gone, and members list reflects the new member.
+      expect(await core.invites.listInvites(inviterWorkspaceId)).toHaveLength(0);
+      const members = await core.users.listMembers(inviterWorkspaceId);
+      expect(members.map((m) => m.email)).toEqual(expect.arrayContaining(["inviter@example.com", email]));
+
+      const inviteeWorkspaceId = inviteeMemberships.find((m) => m.workspaceId !== inviterWorkspaceId)!.workspaceId;
+      await cleanupUser(invitee.id, inviteeWorkspaceId);
+      await db.delete(memberships).where(eq(memberships.workspaceId, inviterWorkspaceId));
+      await cleanupUser(inviter.id, inviterWorkspaceId);
+    });
+
+    it("refreshes an existing pending invite instead of erroring on re-invite", async () => {
+      const owner = await core.users.findOrCreateUser({
+        theonaUserId: `theona-owner-${randomUUID()}`,
+        email: "owner2@example.com",
+      });
+      const workspaceId = (await core.users.listMemberships(owner.id))[0].workspaceId;
+      const email = `reinvite-${randomUUID()}@example.com`;
+
+      await core.invites.createInvite({ workspaceId, email, role: "member", invitedByUserId: owner.id });
+      const refreshed = await core.invites.createInvite({ workspaceId, email, role: "owner", invitedByUserId: owner.id });
+      expect(refreshed.role).toBe("owner");
+
+      const invites = await core.invites.listInvites(workspaceId);
+      expect(invites).toHaveLength(1); // refreshed, not duplicated
+
+      await cleanupUser(owner.id, workspaceId);
+    });
+
+    it("rejects inviting someone already a member", async () => {
+      const owner = await core.users.findOrCreateUser({
+        theonaUserId: `theona-owner3-${randomUUID()}`,
+        email: "owner3@example.com",
+      });
+      const workspaceId = (await core.users.listMemberships(owner.id))[0].workspaceId;
+
+      await expect(
+        core.invites.createInvite({ workspaceId, email: "owner3@example.com", invitedByUserId: owner.id }),
+      ).rejects.toThrow(ValidationError);
+
+      await cleanupUser(owner.id, workspaceId);
+    });
+
+    it("revokes a pending invite", async () => {
+      const owner = await core.users.findOrCreateUser({
+        theonaUserId: `theona-owner4-${randomUUID()}`,
+        email: "owner4@example.com",
+      });
+      const workspaceId = (await core.users.listMemberships(owner.id))[0].workspaceId;
+      const invite = await core.invites.createInvite({
+        workspaceId,
+        email: "revokeme@example.com",
+        invitedByUserId: owner.id,
+      });
+
+      await core.invites.revokeInvite(invite.id);
+      expect(await core.invites.listInvites(workspaceId)).toHaveLength(0);
+      await expect(core.invites.revokeInvite(invite.id)).rejects.toThrow(NotFoundError);
+
+      await cleanupUser(owner.id, workspaceId);
+    });
+
+    it("is a no-op when a login has no pending invites", async () => {
+      const user = await core.users.findOrCreateUser({
+        theonaUserId: `theona-noinvite-${randomUUID()}`,
+        email: `noinvite-${randomUUID()}@example.com`,
+      });
+      // Should not throw, and should not add any extra membership.
+      await core.invites.consumePendingInvites(user.id, user.email);
+      expect(await core.users.listMemberships(user.id)).toHaveLength(1);
+
+      const workspaceId = (await core.users.listMemberships(user.id))[0].workspaceId;
+      await cleanupUser(user.id, workspaceId);
+    });
+  });
 });

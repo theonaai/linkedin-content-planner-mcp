@@ -115,6 +115,9 @@ export function registerAuthRoutes(app: FastifyInstance, core: CoreServices, aut
     }
 
     const user = await core.users.findOrCreateUser({ theonaUserId: userinfo.sub, email: userinfo.email });
+    // Not just first login — an invite may arrive after the invitee already has an account,
+    // so this runs on every successful login (a no-op once there's nothing pending).
+    await core.invites.consumePendingInvites(user.id, user.email);
 
     const sessionToken = await createSessionToken(auth.sessionCookieSecret, { userId: user.id });
     reply.setCookie(SESSION_COOKIE_NAME, sessionToken, {

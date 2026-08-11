@@ -33,6 +33,7 @@ function AccountControls() {
 }
 
 export function Layout() {
+  const { status } = useAuth();
   return (
     <div className="min-h-screen bg-gray-50">
       <header className="border-b border-gray-200 bg-white">
@@ -46,6 +47,11 @@ export function Layout() {
               <NavLink to="/webhooks" className={linkClass}>
                 Webhooks
               </NavLink>
+              {status.kind === "authenticated" && (
+                <NavLink to="/team" className={linkClass}>
+                  Team
+                </NavLink>
+              )}
             </nav>
           </div>
           <AccountControls />

@@ -90,3 +90,20 @@ export interface WebhookDelivery {
   error: string | null;
   createdAt: string;
 }
+
+export type WorkspaceRole = "owner" | "member";
+
+export interface WorkspaceMember {
+  userId: string;
+  email: string;
+  role: WorkspaceRole;
+}
+
+export interface Invite {
+  id: string;
+  workspaceId: string;
+  email: string;
+  role: WorkspaceRole;
+  invitedByUserId: string | null;
+  createdAt: string;
+}

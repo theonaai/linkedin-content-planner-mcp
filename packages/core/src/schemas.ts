@@ -86,3 +86,10 @@ export const updateWebhookInputSchema = z.object({
   secret: z.string().min(1).max(MAX_WEBHOOK_SECRET_LENGTH).nullable().optional(),
   active: z.boolean().optional(),
 });
+
+export const workspaceRoleSchema = z.enum(["owner", "member"]);
+
+export const createInviteInputSchema = z.object({
+  email: z.string().email(),
+  role: workspaceRoleSchema.optional(),
+});

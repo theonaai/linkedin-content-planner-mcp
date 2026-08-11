@@ -69,6 +69,25 @@ export const memberships = pgTable(
   (table) => [unique().on(table.workspaceId, table.userId)],
 );
 
+// A pending "give my ghost-writer access" invite — the invitee may not have ever logged into
+// the planner yet, so there's no users row to point at until they do. Resolved by email at
+// login time (see core.invites.consumePendingInvites): once someone logs in with a matching
+// email, the invite becomes a real membership and this row is deleted.
+export const invites = pgTable(
+  "invites",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    workspaceId: uuid("workspace_id")
+      .notNull()
+      .references(() => workspaces.id, { onDelete: "cascade" }),
+    email: text("email").notNull(),
+    role: varchar("role", { length: 32 }).notNull().default("member"),
+    invitedByUserId: uuid("invited_by_user_id").references(() => users.id, { onDelete: "set null" }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [unique().on(table.workspaceId, table.email)],
+);
+
 export const posts = pgTable("posts", {
   id: uuid("id").primaryKey().defaultRandom(),
   workspaceId: uuid("workspace_id")

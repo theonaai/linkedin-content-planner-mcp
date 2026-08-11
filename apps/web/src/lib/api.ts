@@ -1,6 +1,7 @@
 import type {
   Comment,
   DiffOp,
+  Invite,
   Platform,
   Post,
   PostState,
@@ -10,6 +11,8 @@ import type {
   Webhook,
   WebhookDelivery,
   WebhookEvent,
+  WorkspaceMember,
+  WorkspaceRole,
 } from "./types.js";
 import { getActiveWorkspaceId } from "./workspace.js";
 
@@ -92,4 +95,11 @@ export const api = {
   ) => request<Webhook>(`/webhooks/${id}`, { method: "PATCH", body: JSON.stringify(input) }),
   deleteWebhook: (id: string) => request<void>(`/webhooks/${id}`, { method: "DELETE" }),
   listWebhookDeliveries: (id: string) => request<WebhookDelivery[]>(`/webhooks/${id}/deliveries`),
+
+  listMembers: (workspaceId: string) => request<WorkspaceMember[]>(`/workspaces/${workspaceId}/members`),
+  listInvites: (workspaceId: string) => request<Invite[]>(`/workspaces/${workspaceId}/invites`),
+  createInvite: (workspaceId: string, email: string, role?: WorkspaceRole) =>
+    request<Invite>(`/workspaces/${workspaceId}/invites`, { method: "POST", body: JSON.stringify({ email, role }) }),
+  revokeInvite: (workspaceId: string, inviteId: string) =>
+    request<void>(`/workspaces/${workspaceId}/invites/${inviteId}`, { method: "DELETE" }),
 };

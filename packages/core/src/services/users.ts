@@ -60,7 +60,17 @@ export function createUserService(db: Db) {
     if (!row) throw new NotFoundError("Workspace membership", workspaceId);
   }
 
-  return { findByTheonaId, findOrCreateUser, listMemberships, assertMembership };
+  /** The people who can currently see this workspace — for a "who's on this workspace" team
+   * view alongside pending invites (core.invites.listInvites). */
+  async function listMembers(workspaceId: string) {
+    return db
+      .select({ userId: users.id, email: users.email, role: memberships.role })
+      .from(memberships)
+      .innerJoin(users, eq(memberships.userId, users.id))
+      .where(eq(memberships.workspaceId, workspaceId));
+  }
+
+  return { findByTheonaId, findOrCreateUser, listMemberships, assertMembership, listMembers };
 }
 
 export type UserService = ReturnType<typeof createUserService>;

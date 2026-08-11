@@ -7,6 +7,7 @@ import { loadEnv } from "./env.js";
 import { ensureDefaultWorkspace } from "./workspace.js";
 import { registerErrorHandler } from "./errorHandler.js";
 import { createLocalFsStorage } from "./storage/localFsStorage.js";
+import { createS3Storage } from "./storage/s3Storage.js";
 import { registerPostRoutes } from "./routes/posts.js";
 import { registerVersionRoutes } from "./routes/versions.js";
 import { registerReviewRoutes } from "./routes/reviews.js";
@@ -14,6 +15,7 @@ import { registerCommentRoutes } from "./routes/comments.js";
 import { registerAttachmentRoutes } from "./routes/attachments.js";
 import { registerWebhookRoutes } from "./routes/webhooks.js";
 import { registerAuthRoutes } from "./routes/auth.js";
+import { registerInviteRoutes } from "./routes/invites.js";
 import { registerOAuthRoutes } from "./routes/oauth.js";
 import { registerWellKnownRoutes } from "./routes/well-known.js";
 import { registerMcpRoutes } from "./mcp/route.js";
@@ -21,7 +23,10 @@ import { initOAuthDb } from "./services/oauth/db.js";
 
 const env = loadEnv();
 const db = createDb(env.databaseUrl);
-const storage = createLocalFsStorage(env.attachmentsDir);
+const storage =
+  env.storage.driver === "s3"
+    ? createS3Storage(env.storage)
+    : createLocalFsStorage(env.storage.attachmentsDir);
 const core = createCoreServices(db, storage);
 const workspaceId = await ensureDefaultWorkspace(db);
 initOAuthDb(db);
@@ -46,6 +51,7 @@ registerMcpRoutes(app, core, env.auth, workspaceId);
 // become available.
 if (env.auth.enabled) {
   registerAuthRoutes(app, core, env.auth);
+  registerInviteRoutes(app, core, env.auth);
   await registerOAuthRoutes(app, env.auth);
   registerWellKnownRoutes(app, env.auth);
 }
