@@ -68,41 +68,6 @@ export function UserAvatarIcon(props: SVGProps<SVGSVGElement>) {
   );
 }
 
-// A generic terminal/CLI glyph representing a coding agent — deliberately not any specific
-// vendor's mark (e.g. Claude Code's or Codex's actual logo), since those are trademarked and
-// we have no license to reproduce them. This just reads as "command-line agent."
-export function TerminalIcon(props: SVGProps<SVGSVGElement>) {
-  return (
-    <Icon {...props}>
-      <rect x="3" y="4" width="18" height="16" rx="2.5" />
-      <path d="M7.5 9.5 10.5 12l-3 2.5" />
-      <path d="M13 14.5h3.5" />
-    </Icon>
-  );
-}
-
-// Same reasoning as TerminalIcon — a generic code-braces glyph, not a copy of any vendor's mark.
-export function BracesIcon(props: SVGProps<SVGSVGElement>) {
-  return (
-    <Icon {...props}>
-      <path d="M9 4.5c-1.8 0-2.8.9-2.8 2.8v2.4c0 1.1-.9 2-2 2.3.9.3 2 1.2 2 2.3v2.4c0 1.9 1 2.8 2.8 2.8" />
-      <path d="M15 4.5c1.8 0 2.8.9 2.8 2.8v2.4c0 1.1.9 2 2 2.3-.9.3-2 1.2-2 2.3v2.4c0 1.9-1 2.8-2.8 2.8" />
-    </Icon>
-  );
-}
-
-// A simplified version of the badge shape Theona's own login screen uses (dark rounded square,
-// pale ring) — appropriate here since Theona is this app's own identity/auth partner, not an
-// unaffiliated third party's trademark.
-export function TheonaMarkIcon(props: SVGProps<SVGSVGElement>) {
-  return (
-    <svg viewBox="0 0 24 24" {...props}>
-      <rect x="1" y="1" width="22" height="22" rx="6" fill="currentColor" />
-      <circle cx="12" cy="12" r="5.5" fill="none" stroke="white" strokeWidth="2.2" />
-    </svg>
-  );
-}
-
 // GitHub's mark, used only as the conventional "this links to a GitHub repo" indicator — the
 // same widely-used generic representation shown on virtually every open-source project's badges
 // and link buttons, not a claim of affiliation with GitHub itself.

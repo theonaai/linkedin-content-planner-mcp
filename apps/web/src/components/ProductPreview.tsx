@@ -1,17 +1,7 @@
 import { useEffect, useState, type ReactNode } from "react";
 import { toLinkedInPreview } from "@linkedin-planner/formatting";
 import { POST_STATES, STATE_LABELS } from "../lib/stateMachine.js";
-import {
-  BracesIcon,
-  CommentIcon,
-  GlobeIcon,
-  RepostIcon,
-  SendIcon,
-  TerminalIcon,
-  TheonaMarkIcon,
-  ThumbsUpIcon,
-  UserAvatarIcon,
-} from "./icons.js";
+import { CommentIcon, GlobeIcon, RepostIcon, SendIcon, ThumbsUpIcon, UserAvatarIcon } from "./icons.js";
 import type { PostState } from "../lib/types.js";
 
 // Mirrors the accent hue each state gets in STATE_COLORS (lib/stateMachine.ts) — kept as plain
@@ -26,16 +16,20 @@ const STAGE_COLORS: Record<PostState, string> = {
   posted: "rgb(38,102,178)",
 };
 
-// Generic icons (see icons.tsx), not Claude Code's or Codex's actual trademarked marks — we
-// have no license to reproduce those. Theona's mark is a simplified version of its own real
-// login badge, appropriate since it's this app's own identity/auth partner. Illustrates that
-// any MCP-connected agent (not just one vendor's) can pick up a post at any stage: an AI coding
-// agent drafts, another applies review feedback, and Theona is the identity/org layer every
-// login and MCP token is scoped through.
+// Each service's real brand color (not its logo — colors aren't trademark-protectable the way
+// a mark is, so this is safe to use without a license, unlike reproducing an actual logo file
+// we don't have rights to). Anthropic's clay #D4A27F and OpenAI's teal #10A37F are their
+// published brand colors; Theona's orange is this app's own accent, sourced from the Theona
+// design system this whole app is built on. Illustrates that any MCP-connected agent (not just
+// one vendor's) can pick up a post at any stage: an AI coding agent drafts, another applies
+// review feedback, and Theona is the identity/org layer every login and MCP token is scoped
+// through.
+// Anthropic's clay is light, so white text on it (fine for Codex's teal and Theona's orange)
+// would be hard to read — each agent names the text color that's actually legible on its color.
 const AGENTS = [
-  { id: "claude", label: "Claude Code", color: "rgb(38,102,178)", Icon: TerminalIcon },
-  { id: "codex", label: "Codex", color: "rgb(122,90,201)", Icon: BracesIcon },
-  { id: "theona", label: "Theona", color: "rgb(229,81,43)", Icon: TheonaMarkIcon },
+  { id: "claude", label: "Claude Code", color: "rgb(212,162,127)", textOnColor: "rgb(46,35,25)" },
+  { id: "codex", label: "Codex", color: "rgb(16,163,127)", textOnColor: "white" },
+  { id: "theona", label: "Theona", color: "rgb(229,81,43)", textOnColor: "white" },
 ] as const;
 
 type AgentId = (typeof AGENTS)[number]["id"];
@@ -141,11 +135,14 @@ export function ProductPreview() {
             <span
               key={a.id}
               className={`flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-medium transition-all duration-500 ${
-                active ? "border-transparent text-white" : "border-border bg-surface-2 text-text-muted"
+                active ? "border-transparent" : "border-border bg-surface-2 text-text-muted"
               }`}
-              style={active ? { background: a.color } : undefined}
+              style={active ? { background: a.color, color: a.textOnColor } : undefined}
             >
-              <a.Icon className="h-3.5 w-3.5 shrink-0" style={{ color: active ? "white" : a.color }} />
+              <span
+                className="h-1.5 w-1.5 shrink-0 rounded-full"
+                style={{ background: active ? a.textOnColor : a.color }}
+              />
               {a.label}
             </span>
           );
