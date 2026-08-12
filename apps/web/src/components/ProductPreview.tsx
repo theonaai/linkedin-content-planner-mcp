@@ -1,6 +1,7 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
+import { toLinkedInPreview } from "@linkedin-planner/formatting";
 import { POST_STATES, STATE_LABELS } from "../lib/stateMachine.js";
-import { UserAvatarIcon } from "./icons.js";
+import { CommentIcon, GlobeIcon, RepostIcon, SendIcon, ThumbsUpIcon, UserAvatarIcon } from "./icons.js";
 import type { PostState } from "../lib/types.js";
 
 // Mirrors the accent hue each state gets in STATE_COLORS (lib/stateMachine.ts) — kept as plain
@@ -46,7 +47,7 @@ interface Phase {
 // One pass through this is the whole story: an agent drafts, a reviewer leaves a comment on a
 // specific claim, another agent fixes it, and the post goes out on its scheduled day. Each step
 // owns its own duration and flags, so nothing here is an independent looping animation fighting
-// another one for attention — this was the bug behind the old version showing the comment
+// another one for attention — this was the bug behind an earlier version showing the comment
 // callout twice per pipeline cycle.
 const TIMELINE: Phase[] = [
   { stateIndex: 0, agent: "claude", duration: 1300 },
@@ -62,10 +63,37 @@ const TIMELINE: Phase[] = [
 const WEEK_DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri"];
 const SCHEDULED_DAY_INDEX = 3;
 
+// Real markdown-subset source, run through the app's actual formatting engine (same function
+// LinkedInPreview.tsx uses) — this is a genuine formatting demo, not text styled to look bold.
+// The reviewable claim is deliberately its own segment (not part of the markdown source) so it
+// can be swapped/highlighted independently of the surrounding formatted text.
+const INTRO_MD = "**We shipped three things this week** that make onboarding *dramatically* faster:";
+const BULLETS_BEFORE_CLAIM_MD =
+  "- Smarter defaults out of the box\n- One-click import from your old stack\n- Setup time down to";
+
+const LINKEDIN_BLUE = "#0a66c2";
+const HASHTAG_SPLIT = /(#[\p{L}\p{N}_]+)/gu;
+const HASHTAG_MATCH = /^#[\p{L}\p{N}_]+$/u;
+
+function renderHashtags(text: string): ReactNode[] {
+  return text
+    .split(HASHTAG_SPLIT)
+    .map((part, i) =>
+      HASHTAG_MATCH.test(part) ? (
+        <span key={i} style={{ color: LINKEDIN_BLUE }} className="font-medium">
+          {part}
+        </span>
+      ) : (
+        part
+      ),
+    );
+}
+
 /** A non-interactive, animated illustration of the product for signed-out visitors on the
- * login screen: a mock post moves through the real review pipeline, picked up by a different
- * agent at each stage, gets a reviewer comment on a specific claim, has that claim corrected,
- * and lands on its scheduled day. */
+ * login screen: a mock post, styled like an actual LinkedIn post, moves through the real
+ * review pipeline — picked up by a different agent at each stage, formatted from real
+ * markdown source, gets a reviewer comment on a specific claim, has that claim corrected, and
+ * lands on its scheduled day. */
 export function ProductPreview() {
   const [step, setStep] = useState(0);
   const phase = TIMELINE[step];
@@ -76,6 +104,8 @@ export function ProductPreview() {
   }, [step, phase.duration]);
 
   const activeState = POST_STATES[phase.stateIndex];
+  const introFormatted = toLinkedInPreview(INTRO_MD);
+  const bulletsFormatted = toLinkedInPreview(BULLETS_BEFORE_CLAIM_MD);
 
   return (
     <div className="w-full max-w-[420px] rounded-2xl border border-border bg-surface-1 p-6 shadow-card">
@@ -83,17 +113,7 @@ export function ProductPreview() {
         An agent drafts. You review.
       </p>
 
-      <div className="flex items-center gap-3">
-        <div className="flex h-11 w-11 items-center justify-center rounded-full bg-surface-3 text-text-muted">
-          <UserAvatarIcon className="h-7 w-7" />
-        </div>
-        <div>
-          <p className="text-sm font-semibold text-text-primary">Marketing Agent</p>
-          <p className="text-xs text-text-muted">Drafted by AI · Now</p>
-        </div>
-      </div>
-
-      <div className="mt-4 flex items-center gap-1.5">
+      <div className="mb-4 flex items-center gap-1.5">
         {AGENTS.map((a) => {
           const active = a.id === phase.agent;
           return (
@@ -111,27 +131,81 @@ export function ProductPreview() {
         })}
       </div>
 
-      <div className="relative mt-4 text-sm leading-relaxed text-text-primary">
-        <p>
-          We shipped three things this week that make onboarding{" "}
-          <span
-            key={phase.revised ? "revised" : "original"}
-            className={`relative rounded px-0.5 py-px transition-colors duration-500 ${
-              phase.reviewing ? "animate-preview-pulse bg-accent-soft" : phase.justUpdated ? "animate-preview-flash" : ""
-            }`}
-          >
-            {phase.revised ? "2.4x faster (verified)" : "30% faster"}
+      {/* Styled like a real LinkedIn post (same chrome/icons as the app's actual preview,
+          apps/web/src/components/LinkedInPreview.tsx) — white surface and LinkedIn blue
+          regardless of the app's own theme, on purpose. */}
+      <div className="overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm">
+        <div className="flex items-start gap-2 px-4 pt-4">
+          <div className="flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-full bg-gray-200 text-gray-400">
+            <UserAvatarIcon className="h-8 w-8" />
+          </div>
+          <div className="min-w-0 flex-1">
+            <div className="truncate text-[14px] font-semibold leading-tight text-gray-900">Marketing Agent</div>
+            <div className="truncate text-xs leading-tight text-gray-500">Automating your GTM content</div>
+            <div className="mt-0.5 flex items-center gap-1 text-xs text-gray-500">
+              <span>Now</span>
+              <span>·</span>
+              <GlobeIcon className="h-3 w-3" />
+            </div>
+          </div>
+        </div>
+
+        <div className="px-4 pb-1 pt-3 text-sm leading-normal text-gray-900">
+          <p className="whitespace-pre-wrap">{introFormatted}</p>
+          <p className="mt-2 whitespace-pre-wrap">
+            {bulletsFormatted}{" "}
             <span
-              className={`pointer-events-none absolute -top-9 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-full bg-text-primary px-2.5 py-1 text-[11px] font-medium text-surface-1 transition-all duration-300 ${
-                phase.comment ? "translate-y-0 opacity-100" : "translate-y-1 opacity-0"
+              key={phase.revised ? "revised" : "original"}
+              className={`relative rounded px-0.5 py-px transition-colors duration-500 ${
+                phase.reviewing
+                  ? "animate-preview-pulse bg-accent-soft"
+                  : phase.justUpdated
+                    ? "animate-preview-flash"
+                    : ""
               }`}
             >
-              💬 Can you verify that number?
+              {phase.revised ? "2.4x faster (verified)" : "30% faster"}
+              <span
+                className={`pointer-events-none absolute -top-9 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-full bg-text-primary px-2.5 py-1 text-[11px] font-medium text-surface-1 transition-all duration-300 ${
+                  phase.comment ? "translate-y-0 opacity-100" : "translate-y-1 opacity-0"
+                }`}
+              >
+                💬 Can you verify that number?
+              </span>
             </span>
-          </span>
-          {phase.revised ? " — updated after review. " : ". "}
-          Here&apos;s what changed and why it matters.
-        </p>
+          </p>
+          <p className="mt-2">{renderHashtags("#ProductUpdates #BuildInPublic")}</p>
+        </div>
+
+        <div className="mt-2 flex items-center justify-between px-4 pb-2 text-xs text-gray-500">
+          <div className="flex items-center gap-1">
+            <span className="flex h-4 w-4 items-center justify-center rounded-full bg-[#0a66c2] text-white ring-2 ring-white">
+              <ThumbsUpIcon className="h-2.5 w-2.5" strokeWidth={2.5} />
+            </span>
+            <span className="-ml-1.5 flex h-4 w-4 items-center justify-center rounded-full bg-[#df704c] text-white ring-2 ring-white">
+              ❤
+            </span>
+            <span className="ml-1">57</span>
+          </div>
+          <div>24 comments · 6 reposts</div>
+        </div>
+
+        <div className="grid grid-cols-4 gap-1 border-t border-gray-100 px-2 py-1">
+          {[
+            { icon: ThumbsUpIcon, label: "Like" },
+            { icon: CommentIcon, label: "Comment" },
+            { icon: RepostIcon, label: "Repost" },
+            { icon: SendIcon, label: "Send" },
+          ].map(({ icon: ActionIcon, label }) => (
+            <div
+              key={label}
+              className="flex items-center justify-center gap-1.5 rounded-md py-2 text-[13px] font-medium text-gray-600"
+            >
+              <ActionIcon className="h-4 w-4" />
+              {label}
+            </div>
+          ))}
+        </div>
       </div>
 
       <div className="mt-6">
