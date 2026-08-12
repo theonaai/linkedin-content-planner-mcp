@@ -1,8 +1,8 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import Fastify, { type FastifyInstance } from "fastify";
 import { randomUUID } from "node:crypto";
-import type { CoreServices } from "@linkedin-planner/core";
-import { registerAttachmentRoutes } from "./attachments.js";
+import { type CoreServices, MAX_ATTACHMENT_BYTES } from "@linkedin-planner/core";
+import { registerAttachmentRoutes, UPLOAD_RATE_LIMIT_PER_MINUTE } from "./attachments.js";
 import { mintUploadTicket, UPLOAD_TICKET_TTL_MS } from "../attachments/uploadTicket.js";
 
 const SECRET = "route-test-secret";
@@ -128,6 +128,40 @@ describe("PUT /api/attachments/upload", () => {
 
     expect(response.statusCode).toBe(403);
     expect(moved.calls).toHaveLength(0);
+  });
+
+  it("rejects an invalid ticket before reading the body, not after", async () => {
+    // A body far over the route's own limit still gets a 403 rather than a 413: the ticket is
+    // checked in onRequest, so the payload is never buffered. If this ever returns 413 the
+    // check has drifted back behind body parsing, and an unauthenticated caller can make the
+    // server read 25 MB per request.
+    const response = await app.inject({
+      method: "PUT",
+      url: "/api/attachments/upload?ticket=forged.signature",
+      payload: Buffer.alloc(MAX_ATTACHMENT_BYTES + 1024),
+      headers: { "content-type": "application/octet-stream" },
+    });
+
+    expect(response.statusCode).toBe(403);
+    expect(calls).toHaveLength(0);
+  });
+
+  it("rate-limits repeated attempts from one source", async () => {
+    const attempt = () =>
+      app.inject({
+        method: "PUT",
+        url: "/api/attachments/upload?ticket=forged.signature",
+        payload: Buffer.from("x"),
+        headers: { "content-type": "application/octet-stream" },
+      });
+
+    const codes: number[] = [];
+    for (let i = 0; i < UPLOAD_RATE_LIMIT_PER_MINUTE + 1; i += 1) {
+      codes.push((await attempt()).statusCode);
+    }
+
+    expect(codes.slice(0, UPLOAD_RATE_LIMIT_PER_MINUTE).every((code) => code === 403)).toBe(true);
+    expect(codes.at(-1)).toBe(429);
   });
 
   it("rejects an empty body rather than storing a zero-byte attachment", async () => {

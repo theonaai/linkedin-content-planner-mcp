@@ -1,8 +1,12 @@
 import type { FastifyInstance, FastifyRequest } from "fastify";
+import rateLimit from "@fastify/rate-limit";
 import { type CoreServices, MAX_ATTACHMENT_BYTES } from "@linkedin-planner/core";
 import type { AuthEnv } from "../env.js";
 import { requireResourceAccess } from "../auth/authorize.js";
 import { verifyUploadTicket } from "../attachments/uploadTicket.js";
+
+/** Per-IP ceiling on upload attempts. See the route config below for the reasoning. */
+export const UPLOAD_RATE_LIMIT_PER_MINUTE = 30;
 
 export function registerAttachmentRoutes(
   app: FastifyInstance,
@@ -50,12 +54,39 @@ export function registerAttachmentRoutes(
   // the smallest files. Registered in its own encapsulated scope so the catch-all binary body
   // parser applies to this route and nowhere else.
   app.register(async (scope) => {
+    await scope.register(rateLimit, { global: false });
+
+    // This is the one route with no session behind it — the ticket is the whole credential — so
+    // an unauthenticated caller can reach it and make the server do work. Uploads are inherently
+    // rare (a handful per post), so 30/min/IP sits far above honest traffic while capping what a
+    // single source can force the server to read.
+    //
+    // The limiter is an instance-level hook rather than the route's own `config.rateLimit`
+    // because instance hooks run before route hooks: the flood worth stopping is a stream of
+    // *invalid* tickets, and a route-level limiter never gets to count those — the ticket check
+    // below replies 403 first, so the counter stays at zero while the requests keep coming.
+    scope.addHook("onRequest", scope.rateLimit({ max: UPLOAD_RATE_LIMIT_PER_MINUTE, timeWindow: "1 minute" }));
+
     scope.addContentTypeParser("*", { parseAs: "buffer" }, (_request, body, done) => done(null, body));
 
     scope.put<{ Querystring: { ticket?: string } }>(
       "/api/attachments/upload",
-      { bodyLimit: MAX_ATTACHMENT_BYTES },
+      {
+        bodyLimit: MAX_ATTACHMENT_BYTES,
+        // Checked in onRequest, ahead of body parsing: an invalid ticket then costs one HMAC
+        // instead of up to 25 MB buffered into memory before anything rejects it.
+        onRequest: async (request, reply) => {
+          const verified = verifyUploadTicket(request.query.ticket ?? "", uploadSecret);
+          if (!verified.ok) {
+            return reply
+              .code(403)
+              .send({ error: `Upload ticket ${verified.reason}. Call prepare_attachment_upload again for a fresh one.` });
+          }
+        },
+      },
       async (request, reply) => {
+        // Re-verified rather than stashed on the request in the hook above: the HMAC costs
+        // microseconds, and the handler stays readable without per-request state plumbing.
         const verified = verifyUploadTicket(request.query.ticket ?? "", uploadSecret);
         if (!verified.ok) {
           return reply
