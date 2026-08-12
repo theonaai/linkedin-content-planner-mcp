@@ -1,5 +1,6 @@
 import { NavLink, Outlet } from "react-router-dom";
 import { useAuth } from "../auth/AuthProvider.js";
+import { StyledSelect } from "./StyledSelect.js";
 
 const linkClass = ({ isActive }: { isActive: boolean }) =>
   `rounded-full px-3 py-1.5 text-[13px] sm:px-4 sm:py-[7px] sm:text-sm ${
@@ -15,17 +16,19 @@ function AccountControls() {
   return (
     <div className="flex items-center gap-2.5 sm:gap-3.5">
       {status.memberships.length > 1 && (
-        <select
-          value={activeWorkspaceId ?? ""}
-          onChange={(e) => setActiveWorkspaceId(e.target.value)}
-          className="hidden max-w-[140px] rounded-md border border-border px-2 py-1 text-xs text-text-secondary sm:block"
-        >
-          {status.memberships.map((m) => (
-            <option key={m.workspaceId} value={m.workspaceId}>
-              {m.workspaceName}
-            </option>
-          ))}
-        </select>
+        <div className="hidden max-w-[140px] sm:block">
+          <StyledSelect
+            compact
+            value={activeWorkspaceId ?? ""}
+            onChange={(e) => setActiveWorkspaceId(e.target.value)}
+          >
+            {status.memberships.map((m) => (
+              <option key={m.workspaceId} value={m.workspaceId}>
+                {m.workspaceName}
+              </option>
+            ))}
+          </StyledSelect>
+        </div>
       )}
       <div className="hidden items-center gap-2 sm:flex">
         <div className="h-[26px] w-[26px] rounded-full border border-border bg-surface-3" />

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { api } from "../lib/api.js";
 import { useAuth } from "../auth/AuthProvider.js";
+import { StyledSelect } from "../components/StyledSelect.js";
 import { MAX_WORKSPACE_NAME_LENGTH } from "../lib/limits.js";
 import type { Invite, WorkspaceMember, WorkspaceRole } from "../lib/types.js";
 
@@ -9,9 +10,6 @@ const labelClass = "text-[11px] font-medium uppercase tracking-[0.14em] text-tex
 const inputClass =
   "w-full rounded-xl border border-border bg-surface-2 px-4 py-3 text-sm text-text-primary outline-none focus:border-accent focus:bg-surface-1 focus:ring-4 focus:ring-accent-soft";
 
-/** A styled <select> matching the app's text-input look — a plain <select> renders with the
- * OS's native chrome (different padding/arrow) unless appearance is reset and a custom
- * indicator is drawn back in. */
 function RoleSelect({
   id,
   value,
@@ -26,27 +24,16 @@ function RoleSelect({
   compact?: boolean;
 }) {
   return (
-    <div className="relative">
-      <select
-        id={id}
-        value={value}
-        disabled={disabled}
-        onChange={(e) => onChange(e.target.value as WorkspaceRole)}
-        className={`w-full cursor-pointer appearance-none rounded-xl border border-border bg-surface-2 pl-3.5 text-text-primary outline-none focus:border-accent focus:bg-surface-1 focus:ring-4 focus:ring-accent-soft disabled:cursor-not-allowed disabled:opacity-50 ${
-          compact ? "py-1.5 pr-8 text-xs" : "py-3 pr-9 text-sm"
-        }`}
-      >
-        <option value="member">Member</option>
-        <option value="owner">Owner</option>
-      </select>
-      <span
-        className={`pointer-events-none absolute top-1/2 -translate-y-1/2 text-text-muted ${
-          compact ? "right-2.5 text-[9px]" : "right-3.5 text-[10px]"
-        }`}
-      >
-        ▾
-      </span>
-    </div>
+    <StyledSelect
+      id={id}
+      value={value}
+      disabled={disabled}
+      compact={compact}
+      onChange={(e) => onChange(e.target.value as WorkspaceRole)}
+    >
+      <option value="member">Member</option>
+      <option value="owner">Owner</option>
+    </StyledSelect>
   );
 }
 
