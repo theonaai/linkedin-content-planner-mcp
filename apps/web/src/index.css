@@ -30,3 +30,39 @@ body {
 ::placeholder {
   color: var(--color-text-muted);
 }
+
+/* Login-page product preview (ProductPreview.tsx) — a highlighted phrase "gets commented on"
+   on a loop, illustrating the select-text-to-comment review flow to a signed-out visitor. */
+@keyframes preview-pulse {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 rgba(229, 81, 43, 0.22);
+  }
+  50% {
+    box-shadow: 0 0 0 5px rgba(229, 81, 43, 0.12);
+  }
+}
+.animate-preview-pulse {
+  animation: preview-pulse 2.4s ease-in-out infinite;
+}
+
+@keyframes preview-tooltip {
+  0%,
+  15% {
+    opacity: 0;
+    transform: translate(-50%, 4px);
+  }
+  25%,
+  65% {
+    opacity: 1;
+    transform: translate(-50%, 0);
+  }
+  80%,
+  100% {
+    opacity: 0;
+    transform: translate(-50%, 4px);
+  }
+}
+.animate-preview-tooltip {
+  animation: preview-tooltip 4.8s ease-in-out infinite;
+}
