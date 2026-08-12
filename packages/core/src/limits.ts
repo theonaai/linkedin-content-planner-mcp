@@ -8,6 +8,7 @@ export const MAX_COMMENT_BODY_LENGTH = 10_000;
 export const MAX_REVIEW_BODY_LENGTH = 10_000;
 export const MAX_WEBHOOK_URL_LENGTH = 2048;
 export const MAX_WEBHOOK_SECRET_LENGTH = 256;
+export const MAX_WORKSPACE_NAME_LENGTH = 200;
 
 export const MAX_ATTACHMENT_BYTES = 25 * 1024 * 1024;
 // Total attachment storage a single workspace may accumulate across all its posts, not just

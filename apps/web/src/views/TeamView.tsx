@@ -5,6 +5,102 @@ import type { Invite, WorkspaceMember, WorkspaceRole } from "../lib/types.js";
 
 const ROLE_LABELS: Record<WorkspaceRole, string> = { owner: "Owner", member: "Member" };
 const labelClass = "text-[11px] font-medium uppercase tracking-[0.14em] text-text-muted";
+const inputClass =
+  "w-full rounded-xl border border-border bg-surface-2 px-4 py-3 text-sm text-text-primary outline-none focus:border-accent focus:bg-surface-1 focus:ring-4 focus:ring-accent-soft";
+
+/** A styled <select> matching the app's text-input look — a plain <select> renders with the
+ * OS's native chrome (different padding/arrow) unless appearance is reset and a custom
+ * indicator is drawn back in. */
+function RoleSelect({
+  id,
+  value,
+  onChange,
+  disabled,
+  compact = false,
+}: {
+  id?: string;
+  value: WorkspaceRole;
+  onChange: (role: WorkspaceRole) => void;
+  disabled?: boolean;
+  compact?: boolean;
+}) {
+  return (
+    <div className="relative">
+      <select
+        id={id}
+        value={value}
+        disabled={disabled}
+        onChange={(e) => onChange(e.target.value as WorkspaceRole)}
+        className={`w-full cursor-pointer appearance-none rounded-xl border border-border bg-surface-2 pl-3.5 text-text-primary outline-none focus:border-accent focus:bg-surface-1 focus:ring-4 focus:ring-accent-soft disabled:cursor-not-allowed disabled:opacity-50 ${
+          compact ? "py-1.5 pr-8 text-xs" : "py-3 pr-9 text-sm"
+        }`}
+      >
+        <option value="member">Member</option>
+        <option value="owner">Owner</option>
+      </select>
+      <span
+        className={`pointer-events-none absolute top-1/2 -translate-y-1/2 text-text-muted ${
+          compact ? "right-2.5 text-[9px]" : "right-3.5 text-[10px]"
+        }`}
+      >
+        ▾
+      </span>
+    </div>
+  );
+}
+
+function CreateTeamForm({ onCreated }: { onCreated: (workspaceId: string) => void }) {
+  const [name, setName] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function handleSubmit() {
+    if (!name.trim()) return;
+    setSubmitting(true);
+    setError(null);
+    try {
+      const workspace = await api.createWorkspace(name.trim());
+      setName("");
+      onCreated(workspace.id);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  return (
+    <div className="max-w-[900px] rounded-2xl border border-border bg-surface-1 p-7 shadow-card">
+      <h2 className="text-lg font-semibold tracking-tight text-text-primary">Create a new team</h2>
+      <p className="mt-1.5 text-sm text-text-secondary">
+        Starts a separate workspace with its own posts and members — you're its owner. Switch between teams from the
+        picker in the header.
+      </p>
+      <div className="mt-5 flex flex-col gap-3 sm:flex-row sm:items-end">
+        <div className="flex-1">
+          <label className={`mb-2 block ${labelClass}`} htmlFor="new-team-name">
+            Team name
+          </label>
+          <input
+            id="new-team-name"
+            placeholder="Marketing team"
+            className={inputClass}
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+          />
+        </div>
+        <button
+          onClick={handleSubmit}
+          disabled={submitting || !name.trim()}
+          className="rounded-full bg-accent px-6 py-3 text-sm font-semibold text-white hover:bg-accent-hover disabled:opacity-40"
+        >
+          Create team
+        </button>
+      </div>
+      {error && <p className="mt-2.5 text-xs text-red-600">{error}</p>}
+    </div>
+  );
+}
 
 function InviteForm({ workspaceId, onInvited }: { workspaceId: string; onInvited: () => void }) {
   const [email, setEmail] = useState("");
@@ -43,24 +139,16 @@ function InviteForm({ workspaceId, onInvited }: { workspaceId: string; onInvited
             id="invite-email"
             type="email"
             placeholder="ghostwriter@example.com"
-            className="w-full rounded-xl border border-border bg-surface-2 px-4 py-3 text-sm text-text-primary outline-none focus:border-accent focus:bg-surface-1 focus:ring-4 focus:ring-accent-soft"
+            className={inputClass}
             value={email}
             onChange={(e) => setEmail(e.target.value)}
           />
         </div>
-        <div>
+        <div className="w-[150px]">
           <label className={`mb-2 block ${labelClass}`} htmlFor="invite-role">
             Role
           </label>
-          <select
-            id="invite-role"
-            value={role}
-            onChange={(e) => setRole(e.target.value as WorkspaceRole)}
-            className="w-[150px] rounded-xl border border-border bg-surface-2 px-3.5 py-3 text-sm text-text-primary outline-none focus:border-accent"
-          >
-            <option value="member">Member</option>
-            <option value="owner">Owner</option>
-          </select>
+          <RoleSelect id="invite-role" value={role} onChange={setRole} />
         </div>
         <button
           onClick={handleSubmit}
@@ -76,10 +164,11 @@ function InviteForm({ workspaceId, onInvited }: { workspaceId: string; onInvited
 }
 
 export function TeamView() {
-  const { status, activeWorkspaceId } = useAuth();
+  const { status, activeWorkspaceId, refreshMemberships } = useAuth();
   const [members, setMembers] = useState<WorkspaceMember[]>([]);
   const [invites, setInvites] = useState<Invite[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     if (!activeWorkspaceId) return;
@@ -103,6 +192,33 @@ export function TeamView() {
     load();
   }
 
+  async function handleRoleChange(userId: string, role: WorkspaceRole) {
+    if (!activeWorkspaceId) return;
+    setError(null);
+    try {
+      await api.updateMemberRole(activeWorkspaceId, userId, role);
+      await load();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    }
+  }
+
+  async function handleRemove(userId: string, email: string) {
+    if (!activeWorkspaceId) return;
+    if (!confirm(`Remove ${email} from this workspace?`)) return;
+    setError(null);
+    try {
+      await api.removeMember(activeWorkspaceId, userId);
+      await load();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    }
+  }
+
+  async function handleTeamCreated(workspaceId: string) {
+    await refreshMemberships(workspaceId);
+  }
+
   if (status.kind !== "authenticated" || !activeWorkspaceId) {
     return <p className="text-sm text-text-muted">Team management requires signing in.</p>;
   }
@@ -115,6 +231,10 @@ export function TeamView() {
         <p className="text-[15px] text-text-secondary">Who has access to this workspace.</p>
       </div>
 
+      {error && <p className="max-w-[900px] text-sm text-red-600">{error}</p>}
+
+      <CreateTeamForm onCreated={handleTeamCreated} />
+
       <InviteForm workspaceId={activeWorkspaceId} onInvited={load} />
 
       <div className="max-w-[900px]">
@@ -123,17 +243,41 @@ export function TeamView() {
           <p className="text-xs text-text-muted">Loading…</p>
         ) : (
           <div className="overflow-hidden rounded-2xl border border-border bg-surface-1">
-            {members.map((m) => (
-              <div key={m.userId} className="flex items-center justify-between gap-4 border-b border-border px-5 py-3.5 last:border-b-0">
-                <div className="flex items-center gap-3">
-                  <div className="h-8 w-8 rounded-full border border-border bg-surface-3" />
-                  <span className="text-sm text-text-primary">{m.email}</span>
+            {members.map((m) => {
+              const isSelf = status.userId === m.userId;
+              return (
+                <div
+                  key={m.userId}
+                  className="flex items-center justify-between gap-4 border-b border-border px-5 py-3.5 last:border-b-0"
+                >
+                  <div className="flex items-center gap-3">
+                    <div className="h-8 w-8 rounded-full border border-border bg-surface-3" />
+                    <span className="text-sm text-text-primary">
+                      {m.email}
+                      {isSelf && <span className="ml-1.5 text-xs text-text-muted">(you)</span>}
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-2.5">
+                    <div className="w-[110px]">
+                      <RoleSelect
+                        compact
+                        value={m.role}
+                        disabled={isSelf}
+                        onChange={(role) => handleRoleChange(m.userId, role)}
+                      />
+                    </div>
+                    <button
+                      onClick={() => handleRemove(m.userId, m.email)}
+                      disabled={isSelf}
+                      title={isSelf ? "You can't remove yourself" : undefined}
+                      className="text-xs font-medium text-accent-text hover:underline disabled:cursor-not-allowed disabled:text-text-muted disabled:no-underline"
+                    >
+                      Remove
+                    </button>
+                  </div>
                 </div>
-                <span className="rounded-full bg-surface-2 px-2.5 py-1 text-xs text-text-secondary">
-                  {ROLE_LABELS[m.role]}
-                </span>
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
       </div>

@@ -6,6 +6,7 @@ import {
   MAX_REVIEW_BODY_LENGTH,
   MAX_WEBHOOK_URL_LENGTH,
   MAX_WEBHOOK_SECRET_LENGTH,
+  MAX_WORKSPACE_NAME_LENGTH,
 } from "./limits.js";
 
 export const platformSchema = z.enum(["linkedin", "substack"]);
@@ -88,8 +89,17 @@ export const updateWebhookInputSchema = z.object({
 });
 
 export const workspaceRoleSchema = z.enum(["owner", "member"]);
+export type WorkspaceRole = z.infer<typeof workspaceRoleSchema>;
 
 export const createInviteInputSchema = z.object({
   email: z.string().email(),
   role: workspaceRoleSchema.optional(),
+});
+
+export const updateMemberRoleInputSchema = z.object({
+  role: workspaceRoleSchema,
+});
+
+export const createWorkspaceInputSchema = z.object({
+  name: z.string().trim().min(1).max(MAX_WORKSPACE_NAME_LENGTH),
 });

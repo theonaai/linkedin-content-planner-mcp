@@ -1,5 +1,11 @@
 import type { FastifyInstance, FastifyRequest } from "fastify";
-import { type CoreServices, createInviteInputSchema, NotFoundError } from "@linkedin-planner/core";
+import {
+  type CoreServices,
+  createInviteInputSchema,
+  createWorkspaceInputSchema,
+  updateMemberRoleInputSchema,
+  NotFoundError,
+} from "@linkedin-planner/core";
 import type { AuthEnv } from "../env.js";
 import { requireUserId } from "../auth/authorize.js";
 
@@ -12,10 +18,31 @@ export function registerInviteRoutes(app: FastifyInstance, core: CoreServices, a
     return userId;
   }
 
+  app.post("/api/workspaces", async (request, reply) => {
+    const userId = await requireUserId(request, auth);
+    const input = createWorkspaceInputSchema.parse(request.body);
+    const workspace = await core.users.createWorkspace(userId, input.name);
+    return reply.code(201).send(workspace);
+  });
+
   app.get("/api/workspaces/:workspaceId/members", async (request) => {
     const { workspaceId } = request.params as { workspaceId: string };
     await requireWorkspaceMember(request, workspaceId);
     return core.users.listMembers(workspaceId);
+  });
+
+  app.patch("/api/workspaces/:workspaceId/members/:userId", async (request) => {
+    const { workspaceId, userId } = request.params as { workspaceId: string; userId: string };
+    await requireWorkspaceMember(request, workspaceId);
+    const input = updateMemberRoleInputSchema.parse(request.body);
+    return core.users.updateMemberRole(workspaceId, userId, input.role);
+  });
+
+  app.delete("/api/workspaces/:workspaceId/members/:userId", async (request, reply) => {
+    const { workspaceId, userId } = request.params as { workspaceId: string; userId: string };
+    await requireWorkspaceMember(request, workspaceId);
+    await core.users.removeMember(workspaceId, userId);
+    return reply.code(204).send();
   });
 
   app.post("/api/workspaces/:workspaceId/invites", async (request, reply) => {

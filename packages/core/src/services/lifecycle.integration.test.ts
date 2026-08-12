@@ -583,6 +583,105 @@ describe.skipIf(!connectionString)("post lifecycle (integration)", () => {
     });
   });
 
+  describe("workspace member management", () => {
+    async function makeUser(email: string) {
+      return core.users.findOrCreateUser({ theonaUserId: `theona-test-${randomUUID()}`, email });
+    }
+
+    async function cleanupWorkspace(workspaceId: string, userIds: string[]) {
+      await db.delete(memberships).where(eq(memberships.workspaceId, workspaceId));
+      await db.delete(workspaces).where(eq(workspaces.id, workspaceId));
+      for (const userId of userIds) {
+        await db.delete(memberships).where(eq(memberships.userId, userId));
+        await db.delete(users).where(eq(users.id, userId));
+      }
+    }
+
+    it("creates a workspace with the caller as its sole owner", async () => {
+      const owner = await makeUser("team-creator@example.com");
+      const workspace = await core.users.createWorkspace(owner.id, "New Team");
+      expect(workspace.name).toBe("New Team");
+
+      const members = await core.users.listMembers(workspace.id);
+      expect(members).toEqual([{ userId: owner.id, email: owner.email, role: "owner" }]);
+
+      const ownerPersonalWorkspaceId = (await core.users.listMemberships(owner.id)).find(
+        (m) => m.workspaceId !== workspace.id,
+      )!.workspaceId;
+      await cleanupWorkspace(workspace.id, []);
+      await cleanupWorkspace(ownerPersonalWorkspaceId, [owner.id]);
+    });
+
+    it("promotes and demotes members, blocking whichever change would leave no owner", async () => {
+      const owner = await makeUser("owner@example.com");
+      const member = await makeUser("member@example.com");
+      const workspace = await core.users.createWorkspace(owner.id, "Multi-member Team");
+      await db.insert(memberships).values({ workspaceId: workspace.id, userId: member.id, role: "member" });
+
+      // Promoting is never blocked.
+      await core.users.updateMemberRole(workspace.id, member.id, "owner");
+      expect((await core.users.listMembers(workspace.id)).find((m) => m.userId === member.id)?.role).toBe("owner");
+
+      // Demoting is fine as long as another owner remains.
+      await core.users.updateMemberRole(workspace.id, owner.id, "member");
+      expect((await core.users.listMembers(workspace.id)).find((m) => m.userId === owner.id)?.role).toBe("member");
+
+      // member.id is now the sole owner — demoting them would leave the workspace ownerless.
+      await expect(core.users.updateMemberRole(workspace.id, member.id, "member")).rejects.toThrow(ValidationError);
+
+      const ownerPersonalWorkspaceId = (await core.users.listMemberships(owner.id)).find(
+        (m) => m.workspaceId !== workspace.id,
+      )!.workspaceId;
+      const memberPersonalWorkspaceId = (await core.users.listMemberships(member.id)).find(
+        (m) => m.workspaceId !== workspace.id,
+      )!.workspaceId;
+      await cleanupWorkspace(workspace.id, []);
+      await cleanupWorkspace(ownerPersonalWorkspaceId, [owner.id]);
+      await cleanupWorkspace(memberPersonalWorkspaceId, [member.id]);
+    });
+
+    it("removes a non-owner member, but blocks removing the last owner", async () => {
+      const owner = await makeUser("sole-owner@example.com");
+      const member = await makeUser("removable-member@example.com");
+      const workspace = await core.users.createWorkspace(owner.id, "Removal Test Team");
+      await db.insert(memberships).values({ workspaceId: workspace.id, userId: member.id, role: "member" });
+
+      await core.users.removeMember(workspace.id, member.id);
+      expect(await core.users.listMembers(workspace.id)).toEqual([
+        { userId: owner.id, email: owner.email, role: "owner" },
+      ]);
+
+      await expect(core.users.removeMember(workspace.id, owner.id)).rejects.toThrow(ValidationError);
+
+      const ownerPersonalWorkspaceId = (await core.users.listMemberships(owner.id)).find(
+        (m) => m.workspaceId !== workspace.id,
+      )!.workspaceId;
+      const memberPersonalWorkspaceId = (await core.users.listMemberships(member.id)).find(
+        (m) => m.workspaceId !== workspace.id,
+      )!.workspaceId;
+      await cleanupWorkspace(workspace.id, []);
+      await cleanupWorkspace(ownerPersonalWorkspaceId, [owner.id]);
+      await cleanupWorkspace(memberPersonalWorkspaceId, [member.id]);
+    });
+
+    it("throws NotFoundError updating or removing a membership that doesn't exist", async () => {
+      const owner = await makeUser("no-such-member-owner@example.com");
+      const stranger = await makeUser("not-a-member@example.com");
+      const workspace = await core.users.createWorkspace(owner.id, "Lonely Team");
+
+      await expect(core.users.updateMemberRole(workspace.id, stranger.id, "owner")).rejects.toThrow(NotFoundError);
+      await expect(core.users.removeMember(workspace.id, stranger.id)).rejects.toThrow(NotFoundError);
+
+      const ownerPersonalWorkspaceId = (await core.users.listMemberships(owner.id)).find(
+        (m) => m.workspaceId !== workspace.id,
+      )!.workspaceId;
+      const strangerPersonalWorkspaceId = (await core.users.listMemberships(stranger.id))[0].workspaceId;
+      await cleanupWorkspace(workspace.id, []);
+      await cleanupWorkspace(ownerPersonalWorkspaceId, [owner.id]);
+      await cleanupWorkspace(strangerPersonalWorkspaceId, [stranger.id]);
+    });
+  });
+
   describe("authz workspace resolvers", () => {
     it("resolves the owning workspace for a post, version, comment, and attachment", async () => {
       const post = await core.posts.createPost({ workspaceId, initialContent: "authz test post" });

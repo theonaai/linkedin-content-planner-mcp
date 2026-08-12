@@ -96,7 +96,16 @@ export const api = {
   deleteWebhook: (id: string) => request<void>(`/webhooks/${id}`, { method: "DELETE" }),
   listWebhookDeliveries: (id: string) => request<WebhookDelivery[]>(`/webhooks/${id}/deliveries`),
 
+  createWorkspace: (name: string) =>
+    request<{ id: string; name: string }>("/workspaces", { method: "POST", body: JSON.stringify({ name }) }),
   listMembers: (workspaceId: string) => request<WorkspaceMember[]>(`/workspaces/${workspaceId}/members`),
+  updateMemberRole: (workspaceId: string, userId: string, role: WorkspaceRole) =>
+    request<WorkspaceMember>(`/workspaces/${workspaceId}/members/${userId}`, {
+      method: "PATCH",
+      body: JSON.stringify({ role }),
+    }),
+  removeMember: (workspaceId: string, userId: string) =>
+    request<void>(`/workspaces/${workspaceId}/members/${userId}`, { method: "DELETE" }),
   listInvites: (workspaceId: string) => request<Invite[]>(`/workspaces/${workspaceId}/invites`),
   createInvite: (workspaceId: string, email: string, role?: WorkspaceRole) =>
     request<Invite>(`/workspaces/${workspaceId}/invites`, { method: "POST", body: JSON.stringify({ email, role }) }),
