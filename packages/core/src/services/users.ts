@@ -17,6 +17,12 @@ export function createUserService(db: Db) {
     return workspace;
   }
 
+  async function renameWorkspace(workspaceId: string, name: string) {
+    const [updated] = await db.update(workspaces).set({ name }).where(eq(workspaces.id, workspaceId)).returning();
+    if (!updated) throw new NotFoundError("Workspace", workspaceId);
+    return updated;
+  }
+
   /** Identity is federated from Theona's OAuth AS — there's no local signup step, so the first
    * successful Theona login IS the signup. Lazily provisions a personal workspace + owner
    * membership (mirroring aidl-002's "personal org" pattern) so a brand-new user always has
@@ -120,6 +126,7 @@ export function createUserService(db: Db) {
     findByTheonaId,
     findOrCreateUser,
     createWorkspace,
+    renameWorkspace,
     listMemberships,
     assertMembership,
     listMembers,

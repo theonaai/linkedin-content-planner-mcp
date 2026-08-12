@@ -25,6 +25,13 @@ export function registerInviteRoutes(app: FastifyInstance, core: CoreServices, a
     return reply.code(201).send(workspace);
   });
 
+  app.patch("/api/workspaces/:workspaceId", async (request) => {
+    const { workspaceId } = request.params as { workspaceId: string };
+    await requireWorkspaceMember(request, workspaceId);
+    const input = createWorkspaceInputSchema.parse(request.body);
+    return core.users.renameWorkspace(workspaceId, input.name);
+  });
+
   app.get("/api/workspaces/:workspaceId/members", async (request) => {
     const { workspaceId } = request.params as { workspaceId: string };
     await requireWorkspaceMember(request, workspaceId);

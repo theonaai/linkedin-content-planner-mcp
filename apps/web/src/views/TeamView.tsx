@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { api } from "../lib/api.js";
 import { useAuth } from "../auth/AuthProvider.js";
+import { MAX_WORKSPACE_NAME_LENGTH } from "../lib/limits.js";
 import type { Invite, WorkspaceMember, WorkspaceRole } from "../lib/types.js";
 
 const ROLE_LABELS: Record<WorkspaceRole, string> = { owner: "Owner", member: "Member" };
@@ -45,6 +46,79 @@ function RoleSelect({
       >
         ▾
       </span>
+    </div>
+  );
+}
+
+function WorkspaceNameHeading({ name, onRename }: { name: string; onRename: (name: string) => Promise<void> }) {
+  const [editing, setEditing] = useState(false);
+  const [value, setValue] = useState(name);
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    setValue(name);
+  }, [name]);
+
+  function cancel() {
+    setValue(name);
+    setEditing(false);
+    setError(null);
+  }
+
+  async function save() {
+    const trimmed = value.trim();
+    if (!trimmed || trimmed === name) return cancel();
+    setSubmitting(true);
+    setError(null);
+    try {
+      await onRename(trimmed);
+      setEditing(false);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  if (editing) {
+    return (
+      <div className="flex flex-col gap-1.5">
+        <div className="flex items-center gap-2">
+          <input
+            autoFocus
+            value={value}
+            disabled={submitting}
+            onChange={(e) => setValue(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") save();
+              if (e.key === "Escape") cancel();
+            }}
+            maxLength={MAX_WORKSPACE_NAME_LENGTH}
+            className="rounded-xl border border-border bg-surface-2 px-3 py-1 text-[28px] font-light leading-[1.1] tracking-tight text-text-primary outline-none focus:border-accent focus:bg-surface-1"
+          />
+          <button
+            onClick={save}
+            disabled={submitting || !value.trim()}
+            className="rounded-full bg-accent px-4 py-1.5 text-xs font-semibold text-white disabled:opacity-40"
+          >
+            Save
+          </button>
+          <button onClick={cancel} disabled={submitting} className="rounded-full px-3 py-1.5 text-xs text-text-secondary hover:bg-surface-2">
+            Cancel
+          </button>
+        </div>
+        {error && <p className="text-xs text-red-600">{error}</p>}
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex items-center gap-3">
+      <h1 className="text-[34px] font-light leading-[1.1] tracking-tight text-text-primary">{name}</h1>
+      <button onClick={() => setEditing(true)} className="text-xs font-medium text-accent-text hover:underline">
+        Rename
+      </button>
     </div>
   );
 }
@@ -219,15 +293,26 @@ export function TeamView() {
     await refreshMemberships(workspaceId);
   }
 
+  async function handleRename(name: string) {
+    if (!activeWorkspaceId) return;
+    await api.renameWorkspace(activeWorkspaceId, name);
+    // Re-pulls memberships (which carry workspaceName) so both this page's header and the
+    // header switcher's label update — renameWorkspace's own response isn't enough, since the
+    // switcher reads from AuthProvider's cached membership list, not this component's state.
+    await refreshMemberships(activeWorkspaceId);
+  }
+
   if (status.kind !== "authenticated" || !activeWorkspaceId) {
     return <p className="text-sm text-text-muted">Team management requires signing in.</p>;
   }
+
+  const workspaceName = status.memberships.find((m) => m.workspaceId === activeWorkspaceId)?.workspaceName ?? "Team";
 
   return (
     <div className="flex flex-col gap-6">
       <div className="flex max-w-[640px] flex-col gap-2">
         <p className={labelClass}>People</p>
-        <h1 className="text-[34px] font-light leading-[1.1] tracking-tight text-text-primary">Team</h1>
+        <WorkspaceNameHeading name={workspaceName} onRename={handleRename} />
         <p className="text-[15px] text-text-secondary">Who has access to this workspace.</p>
       </div>
 

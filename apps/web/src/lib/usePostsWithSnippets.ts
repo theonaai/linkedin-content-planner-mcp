@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { api } from "./api.js";
+import { useAuth } from "../auth/AuthProvider.js";
 import type { Post, PostState } from "./types.js";
 
 export interface PostWithSnippet extends Post {
@@ -12,6 +13,12 @@ function toSnippet(markdown: string): string {
 }
 
 export function usePostsWithSnippets(states?: PostState[]) {
+  // Every list request implicitly scopes to whatever workspace is "active" right now (sent as
+  // the x-workspace-id header — see lib/workspace.ts) rather than taking a workspace id as an
+  // argument, so switching the active workspace elsewhere in the app must also be a dependency
+  // here. Without it, this hook only fetches once on mount and keeps showing the previous
+  // workspace's posts until a full page reload.
+  const { activeWorkspaceId } = useAuth();
   const statesKey = states?.join(",") ?? "";
   const [posts, setPosts] = useState<PostWithSnippet[]>([]);
   const [loading, setLoading] = useState(true);
@@ -41,7 +48,7 @@ export function usePostsWithSnippets(states?: PostState[]) {
 
   useEffect(() => {
     reload();
-  }, [reload]);
+  }, [reload, activeWorkspaceId]);
 
   return { posts, loading, error, reload };
 }

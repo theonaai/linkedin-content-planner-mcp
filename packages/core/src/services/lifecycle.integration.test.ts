@@ -612,6 +612,26 @@ describe.skipIf(!connectionString)("post lifecycle (integration)", () => {
       await cleanupWorkspace(ownerPersonalWorkspaceId, [owner.id]);
     });
 
+    it("renames a workspace", async () => {
+      const owner = await makeUser("renamer@example.com");
+      const workspace = await core.users.createWorkspace(owner.id, "Original Name");
+      const renamed = await core.users.renameWorkspace(workspace.id, "New Name");
+      expect(renamed.name).toBe("New Name");
+      expect((await core.users.listMemberships(owner.id)).find((m) => m.workspaceId === workspace.id)?.workspaceName).toBe(
+        "New Name",
+      );
+
+      await expect(
+        core.users.renameWorkspace("00000000-0000-0000-0000-000000000000", "Nope"),
+      ).rejects.toThrow(NotFoundError);
+
+      const ownerPersonalWorkspaceId = (await core.users.listMemberships(owner.id)).find(
+        (m) => m.workspaceId !== workspace.id,
+      )!.workspaceId;
+      await cleanupWorkspace(workspace.id, []);
+      await cleanupWorkspace(ownerPersonalWorkspaceId, [owner.id]);
+    });
+
     it("promotes and demotes members, blocking whichever change would leave no owner", async () => {
       const owner = await makeUser("owner@example.com");
       const member = await makeUser("member@example.com");

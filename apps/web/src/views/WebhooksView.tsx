@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { api } from "../lib/api.js";
+import { useAuth } from "../auth/AuthProvider.js";
 import { MAX_WEBHOOK_URL_LENGTH, MAX_WEBHOOK_SECRET_LENGTH } from "../lib/limits.js";
 import { WEBHOOK_EVENTS, type Webhook, type WebhookDelivery, type WebhookEvent } from "../lib/types.js";
 
@@ -218,6 +219,10 @@ function WebhookRow({ webhook, onChanged }: { webhook: Webhook; onChanged: () =>
 }
 
 export function WebhooksView() {
+  // listWebhooks implicitly scopes to the active workspace (x-workspace-id header), so
+  // switching workspaces elsewhere in the app must trigger a refetch here too — otherwise
+  // this keeps showing the previous workspace's webhooks until a full page reload.
+  const { activeWorkspaceId } = useAuth();
   const [webhooks, setWebhooks] = useState<Webhook[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -228,7 +233,7 @@ export function WebhooksView() {
 
   useEffect(() => {
     load();
-  }, [load]);
+  }, [load, activeWorkspaceId]);
 
   return (
     <div className="flex flex-col gap-6">

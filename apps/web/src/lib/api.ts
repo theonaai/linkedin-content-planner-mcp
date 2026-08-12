@@ -98,6 +98,11 @@ export const api = {
 
   createWorkspace: (name: string) =>
     request<{ id: string; name: string }>("/workspaces", { method: "POST", body: JSON.stringify({ name }) }),
+  renameWorkspace: (workspaceId: string, name: string) =>
+    request<{ id: string; name: string }>(`/workspaces/${workspaceId}`, {
+      method: "PATCH",
+      body: JSON.stringify({ name }),
+    }),
   listMembers: (workspaceId: string) => request<WorkspaceMember[]>(`/workspaces/${workspaceId}/members`),
   updateMemberRole: (workspaceId: string, userId: string, role: WorkspaceRole) =>
     request<WorkspaceMember>(`/workspaces/${workspaceId}/members/${userId}`, {
