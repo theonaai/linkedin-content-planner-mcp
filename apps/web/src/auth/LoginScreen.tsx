@@ -1,8 +1,9 @@
 import { ProductPreview } from "../components/ProductPreview.js";
+import { GitHubIcon } from "../components/icons.js";
 
 export function LoginScreen() {
   return (
-    <div className="flex min-h-screen items-center justify-center bg-bg px-4 py-12">
+    <div className="flex min-h-screen flex-col items-center justify-center gap-8 bg-bg px-4 py-12">
       <div className="flex w-full max-w-4xl flex-col items-center gap-10 lg:flex-row lg:items-center lg:justify-center lg:gap-16">
         <div className="order-2 lg:order-1">
           <ProductPreview />
@@ -21,6 +22,16 @@ export function LoginScreen() {
           </a>
         </div>
       </div>
+
+      <a
+        href="https://github.com/theonaai/linkedin-content-planner-mcp"
+        target="_blank"
+        rel="noopener noreferrer"
+        className="flex items-center gap-1.5 text-xs font-medium text-text-muted hover:text-text-primary"
+      >
+        <GitHubIcon className="h-4 w-4" />
+        Open source on GitHub
+      </a>
     </div>
   );
 }

@@ -1,7 +1,17 @@
 import { useEffect, useState, type ReactNode } from "react";
 import { toLinkedInPreview } from "@linkedin-planner/formatting";
 import { POST_STATES, STATE_LABELS } from "../lib/stateMachine.js";
-import { CommentIcon, GlobeIcon, RepostIcon, SendIcon, ThumbsUpIcon, UserAvatarIcon } from "./icons.js";
+import {
+  BracesIcon,
+  CommentIcon,
+  GlobeIcon,
+  RepostIcon,
+  SendIcon,
+  TerminalIcon,
+  TheonaMarkIcon,
+  ThumbsUpIcon,
+  UserAvatarIcon,
+} from "./icons.js";
 import type { PostState } from "../lib/types.js";
 
 // Mirrors the accent hue each state gets in STATE_COLORS (lib/stateMachine.ts) — kept as plain
@@ -16,14 +26,16 @@ const STAGE_COLORS: Record<PostState, string> = {
   posted: "rgb(38,102,178)",
 };
 
-// Names only, not logos — these render as small colored monogram dots + text, never a copy of
-// anyone's actual mark. Illustrates that any MCP-connected agent (not just one vendor's) can
-// pick up a post at any stage: an AI coding agent drafts, another applies review feedback, and
-// Theona is the identity/org layer every login and MCP token is scoped through.
+// Generic icons (see icons.tsx), not Claude Code's or Codex's actual trademarked marks — we
+// have no license to reproduce those. Theona's mark is a simplified version of its own real
+// login badge, appropriate since it's this app's own identity/auth partner. Illustrates that
+// any MCP-connected agent (not just one vendor's) can pick up a post at any stage: an AI coding
+// agent drafts, another applies review feedback, and Theona is the identity/org layer every
+// login and MCP token is scoped through.
 const AGENTS = [
-  { id: "claude", label: "Claude Code", color: "rgb(38,102,178)" },
-  { id: "codex", label: "Codex", color: "rgb(122,90,201)" },
-  { id: "theona", label: "Theona", color: "rgb(229,81,43)" },
+  { id: "claude", label: "Claude Code", color: "rgb(38,102,178)", Icon: TerminalIcon },
+  { id: "codex", label: "Codex", color: "rgb(122,90,201)", Icon: BracesIcon },
+  { id: "theona", label: "Theona", color: "rgb(229,81,43)", Icon: TheonaMarkIcon },
 ] as const;
 
 type AgentId = (typeof AGENTS)[number]["id"];
@@ -60,8 +72,16 @@ const TIMELINE: Phase[] = [
   { stateIndex: 5, agent: "theona", duration: 2600, revised: true, posted: true },
 ];
 
-const WEEK_DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri"];
+const WEEKDAY_LETTERS = ["M", "T", "W", "T", "F"];
 const SCHEDULED_DAY_INDEX = 3;
+
+/** This week's real Mon–Fri dates — computed once per mount, not re-derived every render,
+ * since "today" can't change while this illustration is on screen. */
+function getCurrentWeekdays(): Date[] {
+  const now = new Date();
+  const monday = new Date(now.getFullYear(), now.getMonth(), now.getDate() - ((now.getDay() + 6) % 7));
+  return Array.from({ length: 5 }, (_, i) => new Date(monday.getFullYear(), monday.getMonth(), monday.getDate() + i));
+}
 
 // Real markdown-subset source, run through the app's actual formatting engine (same function
 // LinkedInPreview.tsx uses) — this is a genuine formatting demo, not text styled to look bold.
@@ -96,6 +116,7 @@ function renderHashtags(text: string): ReactNode[] {
  * lands on its scheduled day. */
 export function ProductPreview() {
   const [step, setStep] = useState(0);
+  const [weekdays] = useState(getCurrentWeekdays);
   const phase = TIMELINE[step];
 
   useEffect(() => {
@@ -124,7 +145,7 @@ export function ProductPreview() {
               }`}
               style={active ? { background: a.color } : undefined}
             >
-              <span className="h-1.5 w-1.5 rounded-full" style={{ background: active ? "white" : a.color }} />
+              <a.Icon className="h-3.5 w-3.5 shrink-0" style={{ color: active ? "white" : a.color }} />
               {a.label}
             </span>
           );
@@ -237,26 +258,27 @@ export function ProductPreview() {
         </p>
       </div>
 
-      <div className="mt-5 flex items-center gap-3 rounded-xl border border-border bg-surface-2 p-3">
-        <span className="text-[11px] font-medium text-text-muted">Scheduled</span>
-        <div className="flex flex-1 justify-end gap-1.5">
-          {WEEK_DAYS.map((day, i) => (
-            <div
-              key={day}
-              className={`relative flex h-7 w-7 items-center justify-center rounded-md text-[10px] font-medium transition-colors duration-500 ${
-                i === SCHEDULED_DAY_INDEX ? "bg-accent-soft text-accent-text" : "text-text-muted"
-              }`}
-              title={day}
-            >
-              {day[0]}
-              {i === SCHEDULED_DAY_INDEX && phase.posted && (
-                <span
-                  key="check"
-                  className="animate-preview-check-pop absolute -right-1 -top-1 flex h-3.5 w-3.5 items-center justify-center rounded-full bg-[rgb(26,127,88)] text-[8px] text-white"
-                >
-                  ✓
-                </span>
-              )}
+      <div className="mt-5 rounded-xl border border-border bg-surface-2 p-3">
+        <p className="mb-2 text-[11px] font-medium text-text-muted">Scheduled</p>
+        <div className="flex justify-between">
+          {weekdays.map((date, i) => (
+            <div key={date.toISOString()} className="flex flex-col items-center gap-1">
+              <span className="text-[9px] font-medium text-text-muted">{WEEKDAY_LETTERS[i]}</span>
+              <div
+                className={`relative flex h-7 w-7 items-center justify-center rounded-md text-[11px] font-medium transition-colors duration-500 ${
+                  i === SCHEDULED_DAY_INDEX ? "bg-accent-soft text-accent-text" : "text-text-secondary"
+                }`}
+              >
+                {date.getDate()}
+                {i === SCHEDULED_DAY_INDEX && phase.posted && (
+                  <span
+                    key="check"
+                    className="animate-preview-check-pop absolute -right-1 -top-1 flex h-3.5 w-3.5 items-center justify-center rounded-full bg-[rgb(26,127,88)] text-[8px] text-white"
+                  >
+                    ✓
+                  </span>
+                )}
+              </div>
             </div>
           ))}
         </div>
