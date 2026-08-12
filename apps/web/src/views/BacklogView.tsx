@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Link } from "react-router-dom";
 import { api } from "../lib/api.js";
 import { usePostsWithSnippets, type PostWithSnippet } from "../lib/usePostsWithSnippets.js";
-import { NEXT_STATES, STATE_CARD_CLASSES, STATE_COLORS, STATE_LABELS } from "../lib/stateMachine.js";
+import { NEXT_STATES, POST_STATES, STATE_CARD_CLASSES, STATE_COLORS, STATE_LABELS } from "../lib/stateMachine.js";
 import type { PostState } from "../lib/types.js";
 
 // Active-pipeline states get the kanban board; backlog and posted can accumulate a lot of
@@ -13,10 +13,16 @@ const KANBAN_STATES: PostState[] = ["todo", "in_progress", "in_review", "ready"]
 const moveButtonClass =
   "rounded-full border border-border bg-surface-1 px-2.5 py-1 text-[11px] font-medium text-text-secondary hover:border-accent hover:text-accent-text";
 
+const ALL_FILTER = "all";
+type StateFilter = PostState | typeof ALL_FILTER;
+
 export function BacklogView() {
   const { posts, loading, error, reload } = usePostsWithSnippets();
   const [newIdea, setNewIdea] = useState("");
   const [creating, setCreating] = useState(false);
+  // Reviewing from a phone is the main mobile use case, so the flat filtered list (mobile
+  // only — see below) opens straight on "in_review" rather than "all".
+  const [mobileFilter, setMobileFilter] = useState<StateFilter>("in_review");
 
   async function handleCreate(e: React.FormEvent) {
     e.preventDefault();
@@ -46,6 +52,8 @@ export function BacklogView() {
   const postedPosts = posts
     .filter((p) => p.state === "posted")
     .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
+  const filteredPosts = (mobileFilter === ALL_FILTER ? posts : posts.filter((p) => p.state === mobileFilter)).slice()
+    .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
 
   return (
     <div className="flex flex-col gap-7">
@@ -70,54 +78,111 @@ export function BacklogView() {
         <p className="text-sm text-text-muted">Loading…</p>
       ) : (
         <>
-          <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
-            {columns.map(({ state, posts: statePosts }) => (
-              <div key={state} className="flex min-h-[190px] flex-col gap-3 rounded-2xl border border-border bg-surface-1 p-4">
-                <div className="flex items-center justify-between">
-                  <span className={`text-[11px] font-semibold uppercase tracking-[0.14em] ${STATE_COLORS[state].label}`}>
-                    {STATE_LABELS[state]}
-                  </span>
-                  <span className="rounded-full bg-surface-3 px-2 py-0.5 text-[11px] font-semibold text-text-muted">
-                    {statePosts.length}
-                  </span>
-                </div>
-                <div className="flex flex-col gap-2">
-                  {statePosts.map((post) => (
-                    <div
-                      key={post.id}
-                      className={`flex flex-col gap-2.5 rounded-lg border border-l-[3px] p-3 ${STATE_CARD_CLASSES[state]}`}
-                    >
-                      <Link to={`/posts/${post.id}`} className="flex flex-col gap-1">
-                        <span className="text-[13px] font-medium leading-snug text-text-primary">
-                          {post.snippet || <span className="italic text-text-muted">(empty)</span>}
-                        </span>
-                        {post.scheduledDate && (
-                          <span className="text-[11px] tabular-nums text-text-muted">{post.scheduledDate}</span>
-                        )}
-                      </Link>
-                      {NEXT_STATES[state].length > 0 && (
-                        <div className="flex flex-wrap gap-1.5">
-                          {NEXT_STATES[state].map((next) => (
-                            <button key={next} onClick={() => advance(post.id, next)} className={moveButtonClass}>
-                              → {STATE_LABELS[next]}
-                            </button>
-                          ))}
-                        </div>
+          {/* Phones: one flat list filtered by state (defaults to "In review", the main mobile
+              use case), instead of the multi-column kanban board which doesn't fit narrow
+              screens. Tablet/desktop keep the full board below, unchanged. */}
+          <div className="flex flex-col gap-3 md:hidden">
+            <div className="-mx-4 flex gap-1.5 overflow-x-auto px-4 pb-1">
+              <FilterPill label="All" active={mobileFilter === ALL_FILTER} onClick={() => setMobileFilter(ALL_FILTER)} />
+              {POST_STATES.map((state) => (
+                <FilterPill
+                  key={state}
+                  label={STATE_LABELS[state]}
+                  active={mobileFilter === state}
+                  onClick={() => setMobileFilter(state)}
+                />
+              ))}
+            </div>
+            {filteredPosts.length === 0 ? (
+              <p className="text-sm text-text-muted">Nothing here.</p>
+            ) : (
+              <div className="flex flex-col gap-2.5">
+                {filteredPosts.map((post) => (
+                  <Link
+                    key={post.id}
+                    to={`/posts/${post.id}`}
+                    className={`flex flex-col gap-2 rounded-xl border border-l-[3px] p-4 ${STATE_CARD_CLASSES[post.state]}`}
+                  >
+                    <div className="flex items-center justify-between gap-3">
+                      <span className={`text-[11px] font-semibold uppercase tracking-[0.1em] ${STATE_COLORS[post.state].label}`}>
+                        {STATE_LABELS[post.state]}
+                      </span>
+                      {post.scheduledDate && (
+                        <span className="text-[11px] tabular-nums text-text-muted">{post.scheduledDate}</span>
                       )}
                     </div>
-                  ))}
-                </div>
+                    <span className="text-sm leading-snug text-text-primary">
+                      {post.snippet || <span className="italic text-text-muted">(empty)</span>}
+                    </span>
+                  </Link>
+                ))}
               </div>
-            ))}
+            )}
           </div>
 
-          <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-            <PostListSection title="Backlog" posts={backlogPosts} onAdvance={advance} />
-            <PostListSection title="Posted" posts={postedPosts} onAdvance={advance} posted />
+          <div className="hidden flex-col gap-7 md:flex">
+            <div className="grid grid-cols-1 gap-4 lg:grid-cols-4">
+              {columns.map(({ state, posts: statePosts }) => (
+                <div key={state} className="flex min-h-[190px] flex-col gap-3 rounded-2xl border border-border bg-surface-1 p-4">
+                  <div className="flex items-center justify-between">
+                    <span className={`text-[11px] font-semibold uppercase tracking-[0.14em] ${STATE_COLORS[state].label}`}>
+                      {STATE_LABELS[state]}
+                    </span>
+                    <span className="rounded-full bg-surface-3 px-2 py-0.5 text-[11px] font-semibold text-text-muted">
+                      {statePosts.length}
+                    </span>
+                  </div>
+                  <div className="flex flex-col gap-2">
+                    {statePosts.map((post) => (
+                      <div
+                        key={post.id}
+                        className={`flex flex-col gap-2.5 rounded-lg border border-l-[3px] p-3 ${STATE_CARD_CLASSES[state]}`}
+                      >
+                        <Link to={`/posts/${post.id}`} className="flex flex-col gap-1">
+                          <span className="text-[13px] font-medium leading-snug text-text-primary">
+                            {post.snippet || <span className="italic text-text-muted">(empty)</span>}
+                          </span>
+                          {post.scheduledDate && (
+                            <span className="text-[11px] tabular-nums text-text-muted">{post.scheduledDate}</span>
+                          )}
+                        </Link>
+                        {NEXT_STATES[state].length > 0 && (
+                          <div className="flex flex-wrap gap-1.5">
+                            {NEXT_STATES[state].map((next) => (
+                              <button key={next} onClick={() => advance(post.id, next)} className={moveButtonClass}>
+                                → {STATE_LABELS[next]}
+                              </button>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+              <PostListSection title="Backlog" posts={backlogPosts} onAdvance={advance} />
+              <PostListSection title="Posted" posts={postedPosts} onAdvance={advance} posted />
+            </div>
           </div>
         </>
       )}
     </div>
+  );
+}
+
+function FilterPill({ label, active, onClick }: { label: string; active: boolean; onClick: () => void }) {
+  return (
+    <button
+      onClick={onClick}
+      className={`shrink-0 rounded-full border px-3.5 py-1.5 text-[13px] font-medium whitespace-nowrap ${
+        active ? "border-[rgba(229,81,43,0.25)] bg-accent-soft text-accent-text" : "border-border bg-surface-1 text-text-secondary"
+      }`}
+    >
+      {label}
+    </button>
   );
 }
 

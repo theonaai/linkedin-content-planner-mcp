@@ -73,7 +73,10 @@ export function CalendarView() {
       {loading ? (
         <p className="text-sm text-text-muted">Loading…</p>
       ) : (
-        <div className="overflow-hidden rounded-2xl border border-border bg-surface-1 shadow-card">
+        // A 7-column month grid can't compress below a legible width, so on narrow screens
+        // the card scrolls horizontally instead of crushing every cell unreadable.
+        <div className="-mx-4 overflow-x-auto px-4 sm:mx-0 sm:px-0">
+        <div className="min-w-[700px] overflow-hidden rounded-2xl border border-border bg-surface-1 shadow-card">
           <div className="grid grid-cols-7 border-b border-border bg-surface-2">
             {WEEKDAYS.map((d) => (
               <div key={d} className="px-3.5 py-3 text-[11px] font-medium uppercase tracking-[0.14em] text-text-muted">
@@ -119,6 +122,7 @@ export function CalendarView() {
               );
             })}
           </div>
+        </div>
         </div>
       )}
     </div>

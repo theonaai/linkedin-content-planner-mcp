@@ -26,6 +26,14 @@ export interface CommentableConfig {
   onChanged: () => void;
 }
 
+// Matches the compose/thread popover's w-72. Selecting text near the right edge of a narrow
+// (mobile-width) preview would otherwise position the popover partly off-screen.
+const OVERLAY_WIDTH = 288;
+
+function clampOverlayLeft(rawLeft: number, areaWidth: number): number {
+  return Math.min(Math.max(0, rawLeft), Math.max(0, areaWidth - OVERLAY_WIDTH));
+}
+
 type Overlay =
   | { type: "pending"; offset: number; length: number; text: string; top: number; left: number }
   | { type: "compose"; offset: number; length: number; text: string; top: number; left: number }
@@ -172,7 +180,7 @@ export function LinkedInPreview({ content, commentable }: { content: string; com
       length: text.length,
       text,
       top: rect.top - areaRect.top,
-      left: Math.max(0, rect.left - areaRect.left),
+      left: clampOverlayLeft(rect.left - areaRect.left, areaRect.width),
     });
   }
 
@@ -187,7 +195,7 @@ export function LinkedInPreview({ content, commentable }: { content: string; com
       type: "thread",
       commentId,
       top: rect.bottom - areaRect.top,
-      left: Math.max(0, rect.left - areaRect.left),
+      left: clampOverlayLeft(rect.left - areaRect.left, areaRect.width),
     });
   }
 

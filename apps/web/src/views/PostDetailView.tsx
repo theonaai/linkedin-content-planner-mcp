@@ -156,7 +156,7 @@ export function PostDetailView() {
         </button>
       </div>
 
-      <div className="flex flex-col gap-5 rounded-2xl border border-border bg-surface-1 p-6 shadow-card">
+      <div className="flex flex-col gap-5 rounded-2xl border border-border bg-surface-1 p-4 shadow-card sm:p-6">
         <div className="flex flex-wrap items-start justify-between gap-6">
           <div className="flex flex-col gap-3.5">
             <div className="flex items-center gap-2.5">
@@ -211,8 +211,11 @@ export function PostDetailView() {
           </p>
         )}
 
+        {/* Reviewing is the main mobile use case, so the LinkedIn preview (and its
+            select-to-comment flow) comes first on narrow screens — the draft editor follows
+            below. Desktop keeps the side-by-side draft-left/preview-right layout. */}
         <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-          <div className="flex flex-col gap-3.5">
+          <div className="order-2 flex flex-col gap-3.5 lg:order-1">
             <p className="text-[11px] font-medium uppercase tracking-[0.14em] text-text-muted">Draft</p>
             <textarea
               ref={textareaRef}
@@ -241,7 +244,7 @@ export function PostDetailView() {
               </span>
             </div>
           </div>
-          <div className="flex flex-col gap-3.5">
+          <div className="order-1 flex flex-col gap-3.5 lg:order-2">
             <p className="text-[11px] font-medium uppercase tracking-[0.14em] text-text-muted">
               LinkedIn preview {commentable && "— select text to comment on it"}
             </p>
@@ -252,12 +255,12 @@ export function PostDetailView() {
       </div>
 
       <div className="rounded-2xl border border-border bg-surface-1 shadow-card">
-        <div className="flex items-center gap-1 border-b border-border px-6">
+        <div className="flex items-center gap-1 overflow-x-auto border-b border-border px-3 sm:px-6">
           {TABS.map((t) => (
             <button
               key={t.id}
               onClick={() => setTab(t.id)}
-              className={`-mb-px border-b-2 px-3.5 py-4 text-sm ${
+              className={`-mb-px shrink-0 border-b-2 px-3 py-4 text-sm sm:px-3.5 ${
                 tab === t.id
                   ? "border-accent font-semibold text-text-primary"
                   : "border-transparent font-medium text-text-muted hover:text-text-secondary"
@@ -268,7 +271,7 @@ export function PostDetailView() {
           ))}
         </div>
 
-        <div className="p-6">
+        <div className="p-4 sm:p-6">
         {tab === "versions" && (
           <VersionsPanel
             postId={post.id}
