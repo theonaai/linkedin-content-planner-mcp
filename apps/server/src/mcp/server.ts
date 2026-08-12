@@ -17,8 +17,15 @@ import {
   MAX_FILENAME_LENGTH,
   MAX_MIME_TYPE_LENGTH,
   MAX_ATTACHMENT_BASE64_LENGTH,
+  MAX_ATTACHMENT_BYTES,
 } from "@linkedin-planner/core";
 import { toLinkedInPreview, MARKDOWN_SUBSET_DESCRIPTION } from "@linkedin-planner/formatting";
+import {
+  mintUploadTicket,
+  uploadUrlFor,
+  UPLOAD_TICKET_TTL_MS,
+  type UploadTicketConfig,
+} from "../attachments/uploadTicket.js";
 
 function jsonContent(data: unknown) {
   // JSON.stringify(undefined) returns undefined, not a string, which the MCP SDK's own
@@ -38,7 +45,7 @@ function safe<T>(fn: () => Promise<T>) {
   };
 }
 
-export function createMcpServer(core: CoreServices, workspaceId: string): McpServer {
+export function createMcpServer(core: CoreServices, workspaceId: string, uploads: UploadTicketConfig): McpServer {
   const server = new McpServer({ name: "linkedin-content-planner", version: "0.0.0" });
 
   // Every tool that operates on an existing resource by id must confirm that resource
@@ -285,11 +292,55 @@ export function createMcpServer(core: CoreServices, workspaceId: string): McpSer
   );
 
   server.registerTool(
+    "prepare_attachment_upload",
+    {
+      description:
+        "Get a short-lived URL to upload an attachment to, instead of passing its bytes through " +
+        "this conversation. Returns an uploadUrl to PUT the raw file bytes to (curl -T <file> " +
+        `'<uploadUrl>'), valid for ${Math.round(UPLOAD_TICKET_TTL_MS / 60_000)} minutes, capped at ` +
+        "25 MB. Prefer this over attach_file for anything but a tiny file: base64 in a tool call " +
+        "costs a large slice of the caller's context and one mistyped character silently corrupts " +
+        "the stored file. The attachment appears once the upload finishes — confirm with " +
+        "list_attachments.",
+      inputSchema: {
+        postId: z.string().uuid(),
+        filename: z.string().max(MAX_FILENAME_LENGTH),
+        mimeType: z.string().max(MAX_MIME_TYPE_LENGTH),
+      },
+    },
+    (args) =>
+      safe(async () => {
+        await assertPostAccess(args.postId);
+        const expiresAt = new Date(Date.now() + UPLOAD_TICKET_TTL_MS);
+        const token = mintUploadTicket(
+          {
+            postId: args.postId,
+            workspaceId,
+            filename: args.filename,
+            mimeType: args.mimeType,
+            exp: expiresAt.getTime(),
+          },
+          uploads.secret,
+        );
+        const uploadUrl = uploadUrlFor(token, uploads.publicBaseUrl);
+        return {
+          uploadUrl,
+          method: "PUT",
+          expiresAt: expiresAt.toISOString(),
+          maxBytes: MAX_ATTACHMENT_BYTES,
+          example: `curl -T /path/to/${args.filename} '${uploadUrl}'`,
+        };
+      })(),
+  );
+
+  server.registerTool(
     "attach_file",
     {
       description:
         `Attach a file (e.g. a PDF carousel or image) to a post. Pass the file bytes as base64 — ` +
-        `capped at 25 MB (${MAX_ATTACHMENT_BASE64_LENGTH.toLocaleString()} base64 characters).`,
+        `capped at 25 MB (${MAX_ATTACHMENT_BASE64_LENGTH.toLocaleString()} base64 characters). ` +
+        `Only worth using for small files: prepare_attachment_upload keeps the bytes out of the ` +
+        `conversation entirely and is the better choice above roughly 100 KB.`,
       inputSchema: {
         postId: z.string().uuid(),
         filename: z.string().max(MAX_FILENAME_LENGTH),

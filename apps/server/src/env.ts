@@ -1,3 +1,5 @@
+import { generateUploadSecret } from "./attachments/uploadTicket.js";
+
 export interface AuthEnv {
   enabled: true;
   /** aidl-002's OAuth AS, no trailing slash. */
@@ -34,6 +36,14 @@ export type StorageEnv = { driver: "local"; attachmentsDir: string } | S3Storage
 export interface Env {
   port: number;
   databaseUrl: string;
+  /** Origin the attachment upload URLs handed to agents are built from, no trailing slash.
+   * Falls back to localhost so `pnpm dev:server` needs no extra configuration. */
+  publicBaseUrl: string;
+  /** HMAC key for attachment upload tickets. Optional: an unset value means a fresh random
+   * key per process, which is fine for one instance and breaks across several, since a ticket
+   * minted by one wouldn't verify on another. Set it explicitly wherever the server is
+   * horizontally scaled or restarts mid-upload-window. */
+  attachmentUploadSecret: string;
   storage: StorageEnv;
   /** Local dev defaults to no auth at all — every request uses the single implicit workspace,
    * exactly as before this feature existed. Only the cloud deployment sets AUTH_ENABLED=true. */
@@ -102,9 +112,12 @@ export function loadEnv(): Env {
   if (!databaseUrl) {
     throw new Error("DATABASE_URL is required");
   }
+  const port = Number(process.env.PORT ?? 3210);
   return {
-    port: Number(process.env.PORT ?? 3210),
+    port,
     databaseUrl,
+    publicBaseUrl: (process.env.APP_PUBLIC_BASE_URL ?? `http://localhost:${port}`).replace(/\/+$/, ""),
+    attachmentUploadSecret: process.env.ATTACHMENT_UPLOAD_SECRET || generateUploadSecret(),
     storage: loadStorageEnv(),
     auth: loadAuthEnv(),
   };
