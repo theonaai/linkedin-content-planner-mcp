@@ -132,7 +132,7 @@ describe("PUT /api/attachments/upload", () => {
 
   it("rejects an invalid ticket before reading the body, not after", async () => {
     // A body far over the route's own limit still gets a 403 rather than a 413: the ticket is
-    // checked in onRequest, so the payload is never buffered. If this ever returns 413 the
+    // checked in preParsing, so the payload is never buffered. If this ever returns 413 the
     // check has drifted back behind body parsing, and an unauthenticated caller can make the
     // server read 25 MB per request.
     const response = await app.inject({
