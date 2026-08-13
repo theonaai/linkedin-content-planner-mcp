@@ -58,6 +58,9 @@ export function Layout() {
             <NavLink to="/" end className={linkClass}>
               Dashboard
             </NavLink>
+            <NavLink to="/connect" className={linkClass}>
+              Connect
+            </NavLink>
             <NavLink to="/webhooks" className={linkClass}>
               Webhooks
             </NavLink>
