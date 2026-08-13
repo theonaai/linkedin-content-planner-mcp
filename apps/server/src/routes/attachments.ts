@@ -55,20 +55,8 @@ export function registerAttachmentRoutes(
   // parser applies to this route and nowhere else.
   app.register(async (scope) => {
     // This is the one route with no session behind it — the ticket is the whole credential — so
-    // an unauthenticated caller can reach it and make the server do work. Uploads are inherently
-    // rare (a handful per post), so 30/min/IP sits far above honest traffic while capping what a
-    // single source can force the server to read.
-    //
-    // Registered in the plugin's global mode, scoped to this encapsulation context (which holds
-    // exactly one route). Global mode installs the limiter as an instance-level hook, and
-    // instance hooks run before route hooks — which is the property that matters here: the flood
-    // worth stopping is a stream of *invalid* tickets, and a route-level `config.rateLimit`
-    // never gets to count those, since the ticket check below replies 403 before it runs.
-    await scope.register(rateLimit, {
-      global: true,
-      max: UPLOAD_RATE_LIMIT_PER_MINUTE,
-      timeWindow: "1 minute",
-    });
+    // an unauthenticated caller can reach it and make the server do work.
+    await scope.register(rateLimit, { global: false });
 
     scope.addContentTypeParser("*", { parseAs: "buffer" }, (_request, body, done) => done(null, body));
 
@@ -76,12 +64,16 @@ export function registerAttachmentRoutes(
       "/api/attachments/upload",
       {
         bodyLimit: MAX_ATTACHMENT_BYTES,
+        // Uploads are inherently rare (a handful per post), so 30/min/IP sits far above honest
+        // traffic while capping what a single source can force the server to read.
+        config: { rateLimit: { max: UPLOAD_RATE_LIMIT_PER_MINUTE, timeWindow: "1 minute" } },
         // preParsing, not onRequest: it still runs before the body is read, so an invalid ticket
         // costs one HMAC instead of up to 25 MB buffered into memory, but it now runs *after*
-        // every onRequest hook. That ordering is what lets the rate limiter above see and count
-        // requests carrying invalid tickets, which is exactly the traffic worth limiting. Put
-        // this check in onRequest and it replies 403 first, leaving the limiter's counter at
-        // zero while the flood continues.
+        // the limiter's onRequest hook. That ordering is the whole point — the flood worth
+        // stopping is a stream of *invalid* tickets, and checking the ticket in onRequest replies
+        // 403 before the limiter ever counts the request, leaving the counter at zero while the
+        // flood continues. The tests pin both halves: 403 rather than 413 on an oversized body,
+        // and 429 on the attempt past the limit.
         preParsing: async (request, reply, payload) => {
           const verified = verifyUploadTicket(request.query.ticket ?? "", uploadSecret);
           if (!verified.ok) {
