@@ -1,4 +1,4 @@
-import { NavLink, Outlet } from "react-router-dom";
+import { Link, NavLink, Outlet } from "react-router-dom";
 import { useAuth } from "../auth/AuthProvider.js";
 import { StyledSelect } from "./StyledSelect.js";
 
@@ -46,14 +46,14 @@ export function Layout() {
     <div className="min-h-screen bg-bg">
       <header className="sticky top-0 z-20 border-b border-border bg-[rgba(246,245,243,0.86)] backdrop-blur-[14px]">
         <div className="mx-auto flex max-w-[1180px] flex-wrap items-center gap-x-3 gap-y-2 px-4 py-2.5 sm:gap-x-7 sm:px-7 sm:py-3">
-          <div className="flex items-center gap-2.5">
+          <Link to="/" className="flex items-center gap-2.5">
             <div className="flex h-[22px] w-[22px] shrink-0 items-center justify-center rounded-md bg-accent text-xs font-bold text-white">
               in
             </div>
             <span className="hidden text-[15px] font-semibold tracking-tight text-text-primary sm:inline">
               LinkedIn Content Planner
             </span>
-          </div>
+          </Link>
           <nav className="flex items-center gap-1">
             <NavLink to="/" end className={linkClass}>
               Dashboard
