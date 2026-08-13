@@ -43,9 +43,12 @@ registerPostRoutes(app, core, env.auth, workspaceId);
 registerVersionRoutes(app, core, env.auth);
 registerReviewRoutes(app, core, env.auth);
 registerCommentRoutes(app, core, env.auth);
-registerAttachmentRoutes(app, core, env.auth);
+registerAttachmentRoutes(app, core, env.auth, env.attachmentUploadSecret);
 registerWebhookRoutes(app, core, env.auth, workspaceId);
-registerMcpRoutes(app, core, env.auth, workspaceId);
+registerMcpRoutes(app, core, env.auth, workspaceId, {
+  secret: env.attachmentUploadSecret,
+  publicBaseUrl: env.publicBaseUrl,
+});
 
 // Local dev has AUTH_ENABLED unset and keeps today's no-login behavior unchanged — only the
 // cloud deployment sets it, at which point "Sign in with Theona" and the MCP OAuth AS both

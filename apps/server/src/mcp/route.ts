@@ -4,6 +4,7 @@ import type { CoreServices } from "@linkedin-planner/core";
 import type { AuthEnv } from "../env.js";
 import { validateBearerAccessToken, REQUIRED_MCP_SCOPE } from "./auth.js";
 import { createMcpServer } from "./server.js";
+import type { UploadTicketConfig } from "../attachments/uploadTicket.js";
 
 const methodNotAllowed = {
   jsonrpc: "2.0" as const,
@@ -84,11 +85,12 @@ async function handleMcpPost(
   core: CoreServices,
   auth: AuthEnv | { enabled: false },
   defaultWorkspaceId: string,
+  uploads: UploadTicketConfig,
 ) {
   const workspaceId = await resolveWorkspace(request, reply, core, auth, defaultWorkspaceId);
   if (!workspaceId) return; // response already sent by resolveWorkspace
 
-  const server = createMcpServer(core, workspaceId);
+  const server = createMcpServer(core, workspaceId, uploads);
   const transport = new StreamableHTTPServerTransport({ sessionIdGenerator: undefined });
 
   reply.hijack();
@@ -106,9 +108,10 @@ export function registerMcpRoutes(
   core: CoreServices,
   auth: AuthEnv | { enabled: false },
   defaultWorkspaceId: string,
+  uploads: UploadTicketConfig,
 ) {
   app.post("/mcp", async (request, reply) => {
-    await handleMcpPost(request, reply, core, auth, defaultWorkspaceId);
+    await handleMcpPost(request, reply, core, auth, defaultWorkspaceId, uploads);
   });
 
   app.get("/mcp", async (_request, reply) => {
