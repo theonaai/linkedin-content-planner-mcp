@@ -1,4 +1,4 @@
-import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
+import { mkdir, open, readFile, rm, writeFile } from "node:fs/promises";
 import { dirname, join, normalize, relative } from "node:path";
 import type { StorageAdapter } from "@linkedin-planner/core";
 
@@ -21,6 +21,17 @@ export function createLocalFsStorage(rootDir: string): StorageAdapter {
     },
     async read(key) {
       return readFile(resolveSafePath(rootDir, key));
+    },
+    async readRange(key, start, end) {
+      const handle = await open(resolveSafePath(rootDir, key), "r");
+      try {
+        const length = end - start + 1;
+        const buffer = Buffer.alloc(length);
+        const { bytesRead } = await handle.read(buffer, 0, length, start);
+        return buffer.subarray(0, bytesRead);
+      } finally {
+        await handle.close();
+      }
     },
     async delete(key) {
       await rm(resolveSafePath(rootDir, key), { force: true });

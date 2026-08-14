@@ -39,6 +39,13 @@ export function createS3Storage(config: S3StorageConfig): StorageAdapter {
       if (!res.Body) throw new Error(`No such key: ${key}`);
       return streamToBuffer(res.Body);
     },
+    async readRange(key, start, end) {
+      const res = await client.send(
+        new GetObjectCommand({ Bucket: config.bucket, Key: key, Range: `bytes=${start}-${end}` }),
+      );
+      if (!res.Body) throw new Error(`No such key: ${key}`);
+      return streamToBuffer(res.Body);
+    },
     async delete(key) {
       await client.send(new DeleteObjectCommand({ Bucket: config.bucket, Key: key }));
     },

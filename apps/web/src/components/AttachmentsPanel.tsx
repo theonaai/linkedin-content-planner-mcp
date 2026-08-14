@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { attachmentsApi, formatBytes, type Attachment } from "../lib/attachments.js";
+import { AttachmentTile, AttachmentLightbox } from "./AttachmentPreview.js";
 import { MAX_ATTACHMENT_BYTES } from "../lib/limits.js";
 
 export function AttachmentsPanel({ postId }: { postId: string }) {
@@ -7,6 +8,7 @@ export function AttachmentsPanel({ postId }: { postId: string }) {
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [opened, setOpened] = useState<Attachment | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const load = useCallback(async () => {
@@ -82,25 +84,33 @@ export function AttachmentsPanel({ postId }: { postId: string }) {
             {browseButton}
             <span className="text-xs text-text-muted">Carousels, images, PDFs — up to 25 MB</span>
           </div>
-          {attachments.map((a) => (
-            <div key={a.id} className="flex items-center justify-between rounded-xl border border-border px-4 py-3 text-sm">
-              <div>
-                <a
-                  href={attachmentsApi.downloadUrl(a.id)}
-                  className="font-medium text-text-primary hover:underline"
-                  download={a.filename}
-                >
-                  {a.filename}
-                </a>
-                <p className="text-xs text-text-muted">
-                  {a.mimeType} · {formatBytes(a.sizeBytes)}
-                </p>
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+            {attachments.map((a) => (
+              <div key={a.id} className="flex flex-col gap-1.5">
+                <AttachmentTile attachment={a} onOpen={() => setOpened(a)} />
+                <div className="flex items-start justify-between gap-2">
+                  <div className="min-w-0">
+                    <a
+                      href={attachmentsApi.downloadUrl(a.id)}
+                      className="block truncate text-[13px] font-medium text-text-primary hover:underline"
+                      download={a.filename}
+                      title={a.filename}
+                    >
+                      {a.filename}
+                    </a>
+                    <p className="text-xs text-text-muted">{formatBytes(a.sizeBytes)}</p>
+                  </div>
+                  <button
+                    onClick={() => handleDelete(a.id)}
+                    className="shrink-0 text-xs font-medium text-accent-text hover:underline"
+                  >
+                    Remove
+                  </button>
+                </div>
               </div>
-              <button onClick={() => handleDelete(a.id)} className="text-xs font-medium text-accent-text hover:underline">
-                Remove
-              </button>
-            </div>
-          ))}
+            ))}
+          </div>
+          {opened && <AttachmentLightbox attachment={opened} onClose={() => setOpened(null)} />}
         </div>
       )}
     </div>
