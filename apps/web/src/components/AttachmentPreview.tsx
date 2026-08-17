@@ -19,14 +19,22 @@ export function PdfPage({
 }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [failed, setFailed] = useState<string | null>(null);
+  const [drawn, setDrawn] = useState(false);
 
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
+    setFailed(null);
+    setDrawn(false);
     const handle = renderPdfPage(canvas, url, pageNumber, width);
     handle.done
-      .then(({ pageCount }) => onPageCount?.(pageCount))
+      .then(({ pageCount }) => {
+        setDrawn(true);
+        onPageCount?.(pageCount);
+      })
       .catch((err: unknown) => {
+        // A superseded render is expected and says nothing about this page. Anything else is
+        // reported: an unexplained blank canvas is the worst of the possible outcomes.
         if (err instanceof RenderCancelled) return;
         setFailed(err instanceof Error ? err.message : String(err));
       });
@@ -40,7 +48,18 @@ export function PdfPage({
       </div>
     );
   }
-  return <canvas ref={canvasRef} className={className} />;
+  return (
+    <div className="relative flex h-full w-full items-center justify-center">
+      <canvas ref={canvasRef} className={className} />
+      {/* Until the first paint lands, say so. Otherwise a page that is still decoding and a page
+          that failed to decode look identical: both are a blank rectangle. */}
+      {!drawn && (
+        <span className="pointer-events-none absolute text-xs text-text-muted" role="status">
+          Rendering…
+        </span>
+      )}
+    </div>
+  );
 }
 
 function PageCounter({ current, total }: { current: number; total: number }) {
