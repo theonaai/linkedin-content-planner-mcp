@@ -65,6 +65,10 @@ export function createMcpServer(core: CoreServices, workspaceId: string, uploads
     const actual = await core.authz.resolveCommentWorkspace(commentId);
     if (actual !== workspaceId) throw new NotFoundError("Comment", commentId);
   }
+  async function assertAttachmentAccess(attachmentId: string): Promise<void> {
+    const actual = await core.authz.resolveAttachmentWorkspace(attachmentId);
+    if (actual !== workspaceId) throw new NotFoundError("Attachment", attachmentId);
+  }
   async function assertWebhookAccess(webhookId: string): Promise<void> {
     const actual = await core.authz.resolveWebhookWorkspace(webhookId);
     if (actual !== workspaceId) throw new NotFoundError("Webhook", webhookId);
@@ -370,6 +374,27 @@ export function createMcpServer(core: CoreServices, workspaceId: string, uploads
       safe(async () => {
         await assertPostAccess(args.postId);
         return core.attachments.listAttachments(args.postId);
+      })(),
+  );
+
+  server.registerTool(
+    "delete_attachment",
+    {
+      description:
+        "Permanently delete an attachment (both its file and its record) — there is no undo. " +
+        "Attachments are the one thing an agent adds repeatedly to the same post: re-rendering a " +
+        "carousel leaves the superseded PDF behind, and those count against the 250 MB per-workspace " +
+        "storage limit. Delete the old file in the same breath as uploading its replacement. Get the " +
+        "id from list_attachments. Deleting a file on a post that is already in review replaces what " +
+        "the reviewer is looking at, so do that only when the reviewer asked for it.",
+      inputSchema: { attachmentId: z.string().uuid() },
+      annotations: { destructiveHint: true, idempotentHint: false },
+    },
+    (args) =>
+      safe(async () => {
+        await assertAttachmentAccess(args.attachmentId);
+        await core.attachments.deleteAttachment(args.attachmentId);
+        return { deleted: true, attachmentId: args.attachmentId };
       })(),
   );
 
