@@ -45,7 +45,7 @@ Posts: `create_post`, `list_posts`, `get_post`, `update_post_content`, `str_repl
 `set_post_state`, `set_post_date`, `delete_post`. Versions: `list_versions`, `get_version_diff`,
 `revert_to_version`. Review: `submit_review`, `list_reviews`. Comments: `add_comment`,
 `list_comments`, `resolve_comment`. Attachments: `prepare_attachment_upload`, `attach_file`,
-`list_attachments`. Preview:
+`list_attachments`, `delete_attachment`. Preview:
 `render_preview`. Webhooks (subscribe to post lifecycle events): `create_webhook`,
 `list_webhooks`, `update_webhook`, `delete_webhook`, `list_webhook_deliveries`. Full tool schemas
 are served at the `/mcp` endpoint itself; see [PLAN.md](./PLAN.md) for the design rationale behind
@@ -64,6 +64,10 @@ prepare_attachment_upload(postId, filename, mimeType)
 curl -T ./carousel.pdf '<uploadUrl>'     # bytes never enter the conversation
 list_attachments(postId)                 # confirm it landed
 ```
+
+`delete_attachment(attachmentId)` removes a file and its record for good. It is worth using
+every time a re-rendered carousel or image supersedes an earlier one: nothing expires on its
+own, and stale files keep counting against the per-workspace limit.
 
 The URL embeds an HMAC-signed ticket scoped to that one post, valid 15 minutes, and rejected
 afterwards. Both paths converge on the same `attachFile` service, so the 25 MB per-file and 250 MB
