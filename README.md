@@ -71,6 +71,25 @@ per-workspace caps apply identically. Set `ATTACHMENT_UPLOAD_SECRET` when runnin
 instance — unset, each process signs with its own random key and a ticket minted by one instance
 will not verify on another.
 
+## Discovery
+
+Two unauthenticated documents let a client — or an MCP registry — learn what this server is and
+how to authenticate before it holds any credential:
+
+| Path | What it says |
+| --- | --- |
+| `/.well-known/mcp.json` | Server card: name, description, version, source repo, and the `streamable-http` endpoint at `/mcp`. Shaped to the MCP registry's [`server.json` schema](https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json), so the bytes served here are the bytes submitted when publishing to a registry. The auth scheme rides in `_meta` under the registry's reverse-DNS key, since server.json has no first-class field for it. |
+| `/.well-known/oauth-protected-resource/mcp` | RFC 9728 Protected Resource Metadata: the resource identifier, the authorization server, and the single `planner:agents` scope. This is what `/mcp`'s 401 `WWW-Authenticate` header points at, and it stays authoritative — the card only signposts it. |
+
+The card is served in every configuration; with `AUTH_ENABLED` unset it advertises
+`authorization: { type: "none" }` and the PRM is not registered at all, because the OAuth
+authorization server it would name is not mounted either. Both documents are built from
+`APP_PUBLIC_BASE_URL`, the same value the token check validates `aud` against.
+
+The server's name and version live in `apps/server/src/mcp/identity.ts` and feed both the card and
+the `serverInfo` block of the MCP `initialize` response, so a registry listing cannot drift from
+what a connected client sees.
+
 ## Monorepo layout
 
 - `apps/server` — REST API + MCP server (Streamable HTTP at `/mcp`), same process, same core logic.

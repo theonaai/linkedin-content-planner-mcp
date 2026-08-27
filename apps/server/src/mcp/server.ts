@@ -26,6 +26,7 @@ import {
   UPLOAD_TICKET_TTL_MS,
   type UploadTicketConfig,
 } from "../attachments/uploadTicket.js";
+import { MCP_SERVER_NAME, MCP_SERVER_VERSION } from "./identity.js";
 
 function jsonContent(data: unknown) {
   // JSON.stringify(undefined) returns undefined, not a string, which the MCP SDK's own
@@ -46,7 +47,7 @@ function safe<T>(fn: () => Promise<T>) {
 }
 
 export function createMcpServer(core: CoreServices, workspaceId: string, uploads: UploadTicketConfig): McpServer {
-  const server = new McpServer({ name: "linkedin-content-planner", version: "0.0.0" });
+  const server = new McpServer({ name: MCP_SERVER_NAME, version: MCP_SERVER_VERSION });
 
   // Every tool that operates on an existing resource by id must confirm that resource
   // actually belongs to this connection's workspace before touching it — otherwise a valid

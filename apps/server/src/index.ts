@@ -50,6 +50,11 @@ registerMcpRoutes(app, core, env.auth, workspaceId, {
   publicBaseUrl: env.publicBaseUrl,
 });
 
+// Unconditional: the MCP server card describes an endpoint that exists in every configuration,
+// and it decides its own `authorization` block from env.auth. The RFC 9728 PRM inside is still
+// gated on auth being on — it names an authorization server that only exists then.
+registerWellKnownRoutes(app, env);
+
 // Local dev has AUTH_ENABLED unset and keeps today's no-login behavior unchanged — only the
 // cloud deployment sets it, at which point "Sign in with Theona" and the MCP OAuth AS both
 // become available.
@@ -57,7 +62,6 @@ if (env.auth.enabled) {
   registerAuthRoutes(app, core, env.auth);
   registerInviteRoutes(app, core, env.auth);
   await registerOAuthRoutes(app, env.auth);
-  registerWellKnownRoutes(app, env.auth);
 }
 
 // Must be last: registers a catch-all 404 handler that falls back to the SPA's index.html.
