@@ -90,6 +90,27 @@ The server's name and version live in `apps/server/src/mcp/identity.ts` and feed
 the `serverInfo` block of the MCP `initialize` response, so a registry listing cannot drift from
 what a connected client sees.
 
+## Publishing to the registry
+
+Listed in the [official MCP registry](https://registry.modelcontextprotocol.io) as
+`app.theona/linkedin-content-planner`. The namespace is the reverse DNS of `theona.app` and is
+proved by an Ed25519 TXT record on that domain's apex; the private half is `MCP_REGISTRY_DNS_KEY`
+and exists nowhere else. Rotation is one new key pair, one edited TXT record, one replaced secret —
+which is why the key needs no escrow and why any doubt about it should be answered by rotating
+rather than investigating.
+
+It is an *environment* secret on `mcp-registry`, not a repository secret. A repository secret is
+readable by any workflow that anyone with write access adds; this one is released only to a job
+that names the environment and clears its rules — a required reviewer, and deployments restricted
+to `v*` tags. So pushing a tag does not publish: it opens a run that waits for a human.
+
+Releasing is pushing a `v<version>` tag once the new version is deployed. The
+`Publish to MCP Registry` workflow fetches `/.well-known/mcp.json` from production and submits
+those bytes; nothing in this repository restates the card, so there is no second copy to drift.
+The order matters and the workflow enforces it: a tag whose version does not match what the
+deployed server reports fails the run rather than publishing the previous release's card under
+the new version's name. Deploy, then tag.
+
 ## Monorepo layout
 
 - `apps/server` — REST API + MCP server (Streamable HTTP at `/mcp`), same process, same core logic.
