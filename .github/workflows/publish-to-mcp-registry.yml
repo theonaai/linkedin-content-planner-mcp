@@ -1,0 +1,84 @@
+# Publish this server's listing to the official MCP registry.
+#
+# The listing is not written here. It is whatever the DEPLOYED server serves at
+# `/.well-known/mcp.json`, which is built from `apps/server/src/mcp/identity.ts`.
+# Fetching it rather than committing a second copy is deliberate: a static
+# `server.json` in this repo would be a second source of truth, and the failure
+# it produces is silent — a registry entry describing a server that no longer
+# answers that way, discovered by whoever installed it.
+#
+# The version guard below turns the one real hazard of reading from production
+# into a loud failure: a tag pushed before the deploy lands would otherwise
+# republish the previous release's card under the new version's name.
+#
+# Publishing is authenticated by an Ed25519 key whose public half is a TXT
+# record on the apex of `theona.app` (`v=MCPv1; k=ed25519; p=...`). Rotation is
+# cheap and is the answer to any suspicion about the secret: generate a new
+# pair, replace the TXT record, replace MCP_REGISTRY_DNS_KEY. The old key stops
+# working the moment the record changes.
+name: Publish to MCP Registry
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Version the deployed server card must report (e.g. 0.1.0)"
+        required: true
+
+permissions:
+  contents: read
+
+concurrency:
+  group: mcp-registry-publish
+  cancel-in-progress: false
+
+env:
+  SERVER_CARD_URL: https://linkedin-mcp.theona.app/.well-known/mcp.json
+  PUBLISHER_VERSION: v1.8.1
+  PUBLISHER_SHA256: a06c9096dcb9727c13555b6be26c7effa707b01f06a4c561ba7a3635443cf2cc
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Fetch the card the deployed server actually serves
+        run: |
+          curl --fail --silent --show-error --location \
+            "$SERVER_CARD_URL" --output server.json
+          jq . server.json
+
+      - name: Refuse to publish a card the deploy has not caught up to
+        env:
+          REQUESTED: ${{ github.event_name == 'push' && github.ref_name || inputs.version }}
+        run: |
+          want="${REQUESTED#v}"
+          have="$(jq -r .version server.json)"
+          if [ "$want" != "$have" ]; then
+            echo "::error::Publishing $want, but $SERVER_CARD_URL still serves $have. Deploy first, then re-run."
+            exit 1
+          fi
+          echo "Deployed card reports $have, which is what was asked for."
+
+      - name: Install mcp-publisher
+        run: |
+          curl --fail --silent --show-error --location \
+            "https://github.com/modelcontextprotocol/registry/releases/download/${PUBLISHER_VERSION}/mcp-publisher_linux_amd64.tar.gz" \
+            --output publisher.tar.gz
+          # Pinned by digest, not just by tag: this binary is about to be handed
+          # the key that can overwrite our registry entry for every user who
+          # installed it.
+          echo "${PUBLISHER_SHA256}  publisher.tar.gz" | sha256sum --check --strict
+          tar -xzf publisher.tar.gz mcp-publisher
+
+      - name: Validate against the registry schema
+        run: ./mcp-publisher validate
+
+      - name: Publish
+        env:
+          DNS_KEY: ${{ secrets.MCP_REGISTRY_DNS_KEY }}
+        run: |
+          ./mcp-publisher login dns --domain theona.app --private-key "$DNS_KEY"
+          ./mcp-publisher publish
