@@ -16,17 +16,26 @@
 # cheap and is the answer to any suspicion about the secret: generate a new
 # pair, replace the TXT record, replace MCP_REGISTRY_DNS_KEY. The old key stops
 # working the moment the record changes.
+#
+# The key is an ENVIRONMENT secret on `mcp-registry`, not a repository secret,
+# and the difference is the point: a repository secret is readable by any
+# workflow anyone with write access adds, whereas this one is released only to a
+# job that names the environment and clears its rules — a required reviewer, and
+# deployments restricted to `v*` tags. Pushing a tag therefore starts a run that
+# waits for a human before it ever sees the key. Keep both properties if this
+# file is reworked; a `secrets.` reference from a job with no `environment:` is
+# the regression to watch for.
 name: Publish to MCP Registry
 
 on:
   push:
     tags:
       - "v*"
+  # Dispatch is for re-running a release whose first attempt failed the version
+  # check. Select the `v*` tag as the ref: the environment refuses anything
+  # else, and the version is read from the ref rather than typed, so a manual
+  # re-run cannot publish under a version nobody tagged.
   workflow_dispatch:
-    inputs:
-      version:
-        description: "Version the deployed server card must report (e.g. 0.1.0)"
-        required: true
 
 permissions:
   contents: read
@@ -43,7 +52,14 @@ env:
 jobs:
   publish:
     runs-on: ubuntu-latest
+    environment: mcp-registry
     steps:
+      - name: Refuse to run anywhere but a tag
+        if: github.ref_type != 'tag'
+        run: |
+          echo "::error::Run this from a v* tag. Version comes from the ref, not from an input."
+          exit 1
+
       - name: Fetch the card the deployed server actually serves
         run: |
           curl --fail --silent --show-error --location \
@@ -52,7 +68,7 @@ jobs:
 
       - name: Refuse to publish a card the deploy has not caught up to
         env:
-          REQUESTED: ${{ github.event_name == 'push' && github.ref_name || inputs.version }}
+          REQUESTED: ${{ github.ref_name }}
         run: |
           want="${REQUESTED#v}"
           have="$(jq -r .version server.json)"
