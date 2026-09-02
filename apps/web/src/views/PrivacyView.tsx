@@ -154,12 +154,20 @@ export function PrivacyView() {
 
         <Section title="Retention">
           <p>
-            Content stays until you delete it or the workspace is deleted. After a workspace is deleted, its data is
-            removed within 30 days, including attachments in object storage.
+            Content stays until you delete it. Deleting a post takes its drafts, comments, reviews and history with
+            it, and removes the files attached to it from object storage as well as from our database.
           </p>
           <p>
-            Webhook delivery records, which duplicate post content, are kept for 30 days and then deleted. Expired
-            OAuth tokens and sessions are removed on expiry.
+            There is no self-service way to erase an entire workspace yet. Write to{" "}
+            <a className="text-text-primary underline underline-offset-4" href={`mailto:${CONTACT}`}>
+              {CONTACT}
+            </a>{" "}
+            and we will erase the workspace and everything in it, and tell you when it is done.
+          </p>
+          <p>
+            A webhook&rsquo;s delivery records duplicate the content of the posts they announce. They are held until
+            you delete the webhook and are erased along with it. Sign-in sessions expire after 14 days, and a token
+            issued to an agent stops working at its expiry.
           </p>
           <p>
             Request logs are held on our hosting platform on its own rolling schedule and expire there. We do not copy
