@@ -1,7 +1,9 @@
+import type { ReactNode } from "react";
+
 const EFFECTIVE = "2 September 2026";
 const CONTACT = "privacy@theona.ai";
 
-function Section({ title, children }: { title: string; children: React.ReactNode }) {
+function Section({ title, children }: { title: string; children: ReactNode }) {
   return (
     <section className="flex flex-col gap-2">
       <h2 className="text-lg font-semibold tracking-tight text-text-primary">{title}</h2>
