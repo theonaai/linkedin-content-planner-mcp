@@ -79,6 +79,33 @@ export function PrivacyView() {
             <strong className="font-medium text-text-primary">Agent connections.</strong> OAuth sessions, grants and
             tokens for the agents you authorise, and the workspace each grant is bound to.
           </p>
+          <p>
+            <strong className="font-medium text-text-primary">Technical data.</strong> Requests to the service are
+            logged with the originating IP address, the browser or client identifier, the path requested and the
+            response. These logs exist to keep the service running and to investigate faults and abuse.
+          </p>
+        </Section>
+
+        <Section title="Cookies and local storage">
+          <p>
+            The Planner sets no advertising cookies, no analytics cookies and no third-party cookies. It runs no
+            analytics or tracking of any kind, so there is nothing here to consent to or opt out of. Three items are
+            stored, all of them necessary for the product to work at all:
+          </p>
+          <p>
+            <strong className="font-medium text-text-primary">planner_session</strong> &mdash; the cookie that keeps
+            you signed in. HTTP-only, sent only over HTTPS, expires after 14 days, and is cleared when you sign out.
+          </p>
+          <p>
+            <strong className="font-medium text-text-primary">theona_oauth_flow</strong> &mdash; a short-lived cookie
+            that holds a single sign-in attempt together while you are redirected to Theona and back. It expires after
+            five minutes.
+          </p>
+          <p>
+            <strong className="font-medium text-text-primary">planner_active_workspace_id</strong> &mdash; stored in
+            your browser, not sent to us as a cookie. It remembers which workspace you last worked in, and only
+            appears if you belong to more than one.
+          </p>
         </Section>
 
         <Section title="How we use it">
@@ -134,6 +161,10 @@ export function PrivacyView() {
             Webhook delivery records, which duplicate post content, are kept for 30 days and then deleted. Expired
             OAuth tokens and sessions are removed on expiry.
           </p>
+          <p>
+            Request logs are held on our hosting platform on its own rolling schedule and expire there. We do not copy
+            them into any archive, warehouse or analytics system of our own.
+          </p>
         </Section>
 
         <Section title="Security">
@@ -150,6 +181,10 @@ export function PrivacyView() {
               {CONTACT}
             </a>
             .
+          </p>
+          <p>
+            If you are in the EEA or the UK you may also lodge a complaint with your national data protection
+            authority. We would rather you came to us first, but that right does not depend on it.
           </p>
           <p>
             EU representative: INSTANT EU GDPR REPRESENTATIVE LIMITED, Office 2, 12A Lower Main Street, Lucan,
