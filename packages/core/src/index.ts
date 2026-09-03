@@ -7,6 +7,7 @@ export * from "./anchorRemap.js";
 export * from "./context.js";
 export * from "./schemas.js";
 export * from "./limits.js";
+export * from "./mediaType.js";
 export * from "./services/posts.js";
 export * from "./services/versions.js";
 export * from "./services/comments.js";

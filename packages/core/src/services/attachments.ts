@@ -9,8 +9,15 @@ import {
   MAX_WORKSPACE_ATTACHMENT_BYTES,
 } from "../limits.js";
 import type { StorageAdapter } from "../storage.js";
+import { detectMediaType, MEDIA_TYPE_SNIFF_BYTES } from "../mediaType.js";
 
 export function createAttachmentService(db: Db, storage: StorageAdapter) {
+  /** Just enough of the file to identify it, without pulling 25 MB to look at 32 bytes. */
+  async function readHead(storageKey: string): Promise<Buffer> {
+    if (storage.readRange) return storage.readRange(storageKey, 0, MEDIA_TYPE_SNIFF_BYTES - 1);
+    return (await storage.read(storageKey)).subarray(0, MEDIA_TYPE_SNIFF_BYTES);
+  }
+
   async function getAttachment(attachmentId: string) {
     const [row] = await db.select().from(attachments).where(eq(attachments.id, attachmentId)).limit(1);
     if (!row) throw new NotFoundError("Attachment", attachmentId);
@@ -75,6 +82,37 @@ export function createAttachmentService(db: Db, storage: StorageAdapter) {
       const meta = await getAttachment(attachmentId);
       const data = await storage.read(meta.storageKey);
       return { meta, data };
+    },
+
+    /** Metadata plus what the bytes actually are, or null when they are nothing we will show
+     * inline. The stored mimeType is not consulted: it is whatever the uploader claimed. */
+    async describeForPreview(attachmentId: string) {
+      const meta = await getAttachment(attachmentId);
+      return { meta, detected: detectMediaType(await readHead(meta.storageKey)) };
+    },
+
+    /** One inclusive byte window, for serving HTTP Range requests. */
+    async readAttachmentRange(attachmentId: string, start: number, end: number) {
+      const meta = await getAttachment(attachmentId);
+      if (storage.readRange) return storage.readRange(meta.storageKey, start, end);
+      return (await storage.read(meta.storageKey)).subarray(start, end + 1);
+    },
+
+    /** The list the web UI renders, with each entry told apart by its bytes so a video the
+     * uploader labelled application/octet-stream still gets a video tile. Costs one small
+     * ranged read per attachment; posts carry a handful, not hundreds. */
+    async listAttachmentsForPreview(postId: string) {
+      const rows = await db
+        .select()
+        .from(attachments)
+        .where(eq(attachments.postId, postId))
+        .orderBy(asc(attachments.createdAt));
+      return Promise.all(
+        rows.map(async (row) => ({
+          ...row,
+          previewKind: detectMediaType(await readHead(row.storageKey))?.kind ?? null,
+        })),
+      );
     },
 
     async deleteAttachment(attachmentId: string) {

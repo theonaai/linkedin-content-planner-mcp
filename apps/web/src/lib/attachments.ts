@@ -1,3 +1,8 @@
+/** What the file turned out to be when the server sniffed its bytes, which is not always what
+ * mimeType claims: an mp4 uploaded with curl arrives as application/octet-stream. null means
+ * the server will not serve it inline, so it stays a download-only row. */
+export type PreviewKind = "image" | "video" | "pdf";
+
 export interface Attachment {
   id: string;
   postId: string;
@@ -6,6 +11,7 @@ export interface Attachment {
   mimeType: string;
   sizeBytes: number;
   createdAt: string;
+  previewKind: PreviewKind | null;
 }
 
 export const attachmentsApi = {
@@ -30,6 +36,8 @@ export const attachmentsApi = {
   },
 
   downloadUrl: (id: string) => `/api/attachments/${id}/download`,
+
+  previewUrl: (id: string) => `/api/attachments/${id}/preview`,
 };
 
 export function formatBytes(bytes: number): string {

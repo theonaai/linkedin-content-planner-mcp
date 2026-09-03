@@ -8,6 +8,39 @@ import { verifyUploadTicket } from "../attachments/uploadTicket.js";
 /** Per-IP ceiling on upload attempts. See the route config below for the reasoning. */
 export const UPLOAD_RATE_LIMIT_PER_MINUTE = 30;
 
+/**
+ * A single `bytes=` range, which is all a media element ever asks for. Multipart ranges are
+ * legal HTTP and no browser sends them for `<video>`, so they are treated as no range at all
+ * and answered with the whole file, which is a valid response to any range request.
+ *
+ * Returns "invalid" only for a range that cannot be satisfied (start past the end), which owes
+ * the caller a 416 rather than a silent full body.
+ */
+export function parseRangeHeader(
+  header: string | undefined,
+  sizeBytes: number,
+): { start: number; end: number } | "invalid" | null {
+  if (!header) return null;
+  const match = /^bytes=(\d*)-(\d*)$/.exec(header.trim());
+  if (!match) return null;
+
+  const [, rawStart, rawEnd] = match;
+  if (rawStart === "" && rawEnd === "") return null;
+
+  // "bytes=-500" means the last 500 bytes, not "up to byte 500".
+  if (rawStart === "") {
+    const suffixLength = Number(rawEnd);
+    if (suffixLength === 0) return "invalid";
+    return { start: Math.max(0, sizeBytes - suffixLength), end: sizeBytes - 1 };
+  }
+
+  const start = Number(rawStart);
+  if (start >= sizeBytes) return "invalid";
+  const end = rawEnd === "" ? sizeBytes - 1 : Math.min(Number(rawEnd), sizeBytes - 1);
+  if (end < start) return "invalid";
+  return { start, end };
+}
+
 export function registerAttachmentRoutes(
   app: FastifyInstance,
   core: CoreServices,
@@ -27,7 +60,10 @@ export function registerAttachmentRoutes(
   app.get("/api/posts/:id/attachments", async (request) => {
     const { id } = request.params as { id: string };
     await checkPostAccess(request, id);
-    return core.attachments.listAttachments(id);
+    // The UI needs to know which tile to render before it fetches any bytes, and the stored
+    // mimeType is too unreliable to decide that — `curl -F` alone labels an mp4 as
+    // application/octet-stream. previewKind is sniffed from the file itself.
+    return core.attachments.listAttachmentsForPreview(id);
   });
 
   app.post("/api/posts/:id/attachments", async (request, reply) => {
@@ -113,6 +149,45 @@ export function registerAttachmentRoutes(
         return reply.code(201).send(attachment);
       },
     );
+  });
+
+  // Serving an attachment for display rather than download. Everything here follows from one
+  // fact: these bytes came from outside and are served from the same origin as the app and its
+  // session cookie. So the type is decided by sniffing the file, never by the mimeType the
+  // uploader supplied; anything not on the sniffed whitelist is refused rather than guessed at;
+  // and the response carries nosniff plus a sandbox CSP so a file that slipped through as the
+  // wrong type still cannot execute anything. SVG is deliberately absent from the whitelist.
+  app.get("/api/attachments/:id/preview", async (request, reply) => {
+    const { id } = request.params as { id: string };
+    await checkAttachmentAccess(request, id);
+
+    const { meta, detected } = await core.attachments.describeForPreview(id);
+    if (!detected) {
+      return reply.code(415).send({ error: `${meta.filename} is not a file type this service previews inline.` });
+    }
+
+    reply.header("Content-Type", detected.mimeType);
+    reply.header("Content-Disposition", `inline; filename="${encodeURIComponent(meta.filename)}"`);
+    reply.header("X-Content-Type-Options", "nosniff");
+    reply.header("Content-Security-Policy", "default-src 'none'; media-src 'self'; sandbox");
+    reply.header("Cache-Control", "private, max-age=300");
+    reply.header("Accept-Ranges", "bytes");
+
+    const range = parseRangeHeader(request.headers.range, meta.sizeBytes);
+    if (range === "invalid") {
+      return reply.code(416).header("Content-Range", `bytes */${meta.sizeBytes}`).send();
+    }
+    if (range) {
+      const data = await core.attachments.readAttachmentRange(id, range.start, range.end);
+      return reply
+        .code(206)
+        .header("Content-Range", `bytes ${range.start}-${range.end}/${meta.sizeBytes}`)
+        .header("Content-Length", String(data.length))
+        .send(data);
+    }
+
+    const { data } = await core.attachments.downloadAttachment(id);
+    return reply.send(data);
   });
 
   app.get("/api/attachments/:id/download", async (request, reply) => {
