@@ -1,5 +1,6 @@
 import type { FastifyInstance } from "fastify";
-import { type CoreServices, createAccessKeyInputSchema } from "@linkedin-planner/core";
+import { z } from "zod";
+import { type CoreServices, createAccessKeyInputSchema, NotFoundError } from "@linkedin-planner/core";
 import type { AuthEnv } from "../env.js";
 import { requireUserId, resolveCallerWorkspace } from "../auth/authorize.js";
 
@@ -20,6 +21,8 @@ export function registerAccessKeyRoutes(app: FastifyInstance, core: CoreServices
   app.delete("/api/access-keys/:keyId", async (request, reply) => {
     const { keyId } = request.params as { keyId: string };
     const userId = await requireUserId(request, auth);
+    // A malformed id would otherwise reach Postgres as an invalid uuid and surface as a 500.
+    if (!z.string().uuid().safeParse(keyId).success) throw new NotFoundError("Access key", keyId);
     await core.accessKeys.revokeAccessKey(userId, keyId);
     return reply.code(204).send();
   });
