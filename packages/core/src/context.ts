@@ -8,6 +8,7 @@ import { createWebhookService } from "./services/webhooks.js";
 import { createUserService } from "./services/users.js";
 import { createAuthzService } from "./services/authz.js";
 import { createInviteService } from "./services/invites.js";
+import { createAccessKeyService } from "./services/accessKeys.js";
 import type { StorageAdapter } from "./storage.js";
 
 export function createCoreServices(db: Db, storage: StorageAdapter) {
@@ -24,8 +25,9 @@ export function createCoreServices(db: Db, storage: StorageAdapter) {
   const users = createUserService(db);
   const authz = createAuthzService(db);
   const invites = createInviteService(db);
+  const accessKeys = createAccessKeyService(db);
 
-  return { posts, versions, comments, reviews, attachments, webhooks, users, authz, invites };
+  return { posts, versions, comments, reviews, attachments, webhooks, users, authz, invites, accessKeys };
 }
 
 export type CoreServices = ReturnType<typeof createCoreServices>;

@@ -48,8 +48,15 @@ async function resolveWorkspace(
   if (!auth.enabled) return defaultWorkspaceId;
 
   const authHeader = typeof request.headers.authorization === "string" ? request.headers.authorization : undefined;
-  const resolution = await validateBearerAccessToken(authHeader, auth);
+  const resolution = await validateBearerAccessToken(authHeader, auth, core.accessKeys);
 
+  if (resolution.kind === "unavailable") {
+    // 503, never 401: a 401 tells the holder of a working key to replace it over one slow
+    // minute in the database.
+    request.log.error({ err: resolution.cause }, "MCP access key lookup failed");
+    reply.code(503).send(transportError(-32003, "Service Unavailable: could not verify the access key. Retry shortly."));
+    return null;
+  }
   if (resolution.kind === "unauthenticated") {
     reply
       .header("WWW-Authenticate", buildWwwAuthenticate(auth, { kind: "unauthenticated", errorDescription: resolution.reason }))

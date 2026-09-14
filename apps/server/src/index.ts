@@ -16,6 +16,7 @@ import { registerAttachmentRoutes } from "./routes/attachments.js";
 import { registerWebhookRoutes } from "./routes/webhooks.js";
 import { registerAuthRoutes } from "./routes/auth.js";
 import { registerInviteRoutes } from "./routes/invites.js";
+import { registerAccessKeyRoutes } from "./routes/accessKeys.js";
 import { registerOAuthRoutes } from "./routes/oauth.js";
 import { registerWellKnownRoutes } from "./routes/well-known.js";
 import { registerMcpRoutes } from "./mcp/route.js";
@@ -61,6 +62,7 @@ registerWellKnownRoutes(app, env);
 if (env.auth.enabled) {
   registerAuthRoutes(app, core, env.auth);
   registerInviteRoutes(app, core, env.auth);
+  registerAccessKeyRoutes(app, core, env.auth);
   await registerOAuthRoutes(app, env.auth);
 }
 

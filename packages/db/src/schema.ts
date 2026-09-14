@@ -88,6 +88,25 @@ export const invites = pgTable(
   (table) => [unique().on(table.workspaceId, table.email)],
 );
 
+// A long-lived credential for an MCP client that cannot run the OAuth flow — an Apify Standby
+// Actor, whose Authorization header already carries the caller's Apify token. It opens /mcp for
+// one workspace as the user who created it. Only the key's sha256 is stored, so a leak of this
+// table cannot be replayed against /mcp.
+export const mcpAccessKeys = pgTable("mcp_access_keys", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  userId: uuid("user_id")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  workspaceId: uuid("workspace_id")
+    .notNull()
+    .references(() => workspaces.id, { onDelete: "cascade" }),
+  label: text("label").notNull(),
+  keyHash: text("key_hash").notNull().unique(),
+  lastUsedAt: timestamp("last_used_at", { withTimezone: true }),
+  revokedAt: timestamp("revoked_at", { withTimezone: true }),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
 export const posts = pgTable("posts", {
   id: uuid("id").primaryKey().defaultRandom(),
   workspaceId: uuid("workspace_id")

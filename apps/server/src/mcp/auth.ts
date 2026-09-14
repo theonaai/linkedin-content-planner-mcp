@@ -1,12 +1,15 @@
 /**
  * MCP resource-server auth: verifies bearer access tokens minted by the planner's own OAuth
  * AS (services/oauth/*). Per RFC 6750 + 9068 + 8707: Bearer scheme, JWS signature against the
- * AS's own JWKS, `iss`, `aud`, `exp`/`nbf`, and the required scope.
+ * AS's own JWKS, `iss`, `aud`, `exp`/`nbf`, and the required scope. A bearer carrying
+ * `MCP_ACCESS_KEY_PREFIX` is a long-lived access key instead, looked up by its hash.
  *
  * Returns a discriminated union — `ok` (authenticated context), `unauthenticated` (transport
- * emits 401 + WWW-Authenticate pointing at the PRM doc), or `forbidden` (403, missing scope).
+ * emits 401 + WWW-Authenticate pointing at the PRM doc), `forbidden` (403, missing scope), or
+ * `unavailable` (503, the access-key store could not answer).
  */
 import { createRemoteJWKSet, errors as joseErrors, jwtVerify } from "jose";
+import { isMcpAccessKey, type AccessKeyService } from "@linkedin-planner/core";
 import type { AuthEnv } from "../env.js";
 import { mcpResourceIdentifier } from "../services/oauth/resource.js";
 
@@ -22,9 +25,12 @@ export interface McpRequestContext {
 
 export type TokenValidationFailure =
   | { kind: "unauthenticated"; reason: string }
-  | { kind: "forbidden"; reason: string; requiredScope: string };
+  | { kind: "forbidden"; reason: string; requiredScope: string }
+  | { kind: "unavailable"; reason: string; cause: unknown };
 
 export type TokenValidationResult = { kind: "ok"; context: McpRequestContext } | TokenValidationFailure;
+
+export type AccessKeyLookup = Pick<AccessKeyService, "findActiveAccessKey" | "recordAccessKeyUse">;
 
 let jwksFetcher: ReturnType<typeof createRemoteJWKSet> | null = null;
 let jwksIssuer: string | null = null;
@@ -58,12 +64,34 @@ function formatJoseError(err: unknown): string {
   return "Access token validation failed";
 }
 
+async function validateAccessKey(accessKey: string, accessKeys: AccessKeyLookup): Promise<TokenValidationResult> {
+  let key;
+  try {
+    key = await accessKeys.findActiveAccessKey(accessKey);
+  } catch (err) {
+    return { kind: "unavailable", reason: "Could not verify the access key", cause: err };
+  }
+
+  // One answer for an unknown key and a revoked one.
+  if (!key) return { kind: "unauthenticated", reason: "Access key is invalid or revoked" };
+
+  // `lastUsedAt` is informational; failing to record it must not fail the request.
+  accessKeys.recordAccessKeyUse(key).catch(() => undefined);
+  return {
+    kind: "ok",
+    context: { userId: key.userId, clientId: null, workspaceId: key.workspaceId, scopes: [REQUIRED_MCP_SCOPE] },
+  };
+}
+
 export async function validateBearerAccessToken(
   authHeader: string | undefined,
   auth: AuthEnv,
+  accessKeys: AccessKeyLookup,
 ): Promise<TokenValidationResult> {
   const token = parseBearer(authHeader);
   if (!token) return { kind: "unauthenticated", reason: "Missing or malformed Authorization header" };
+
+  if (isMcpAccessKey(token)) return validateAccessKey(token, accessKeys);
 
   const issuer = auth.appPublicBaseUrl;
   const audience = mcpResourceIdentifier(auth);

@@ -1,5 +1,7 @@
 import type {
+  AccessKey,
   Comment,
+  CreatedAccessKey,
   DiffOp,
   Invite,
   Platform,
@@ -116,4 +118,9 @@ export const api = {
     request<Invite>(`/workspaces/${workspaceId}/invites`, { method: "POST", body: JSON.stringify({ email, role }) }),
   revokeInvite: (workspaceId: string, inviteId: string) =>
     request<void>(`/workspaces/${workspaceId}/invites/${inviteId}`, { method: "DELETE" }),
+
+  listAccessKeys: () => request<AccessKey[]>("/access-keys"),
+  createAccessKey: (label: string) =>
+    request<CreatedAccessKey>("/access-keys", { method: "POST", body: JSON.stringify({ label }) }),
+  revokeAccessKey: (id: string) => request<void>(`/access-keys/${id}`, { method: "DELETE" }),
 };
