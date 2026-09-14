@@ -13,9 +13,10 @@ export function LoginScreen() {
           <h1 className="text-lg font-semibold text-text-primary">LinkedIn Content Planner</h1>
           <p className="mt-2 text-sm text-text-secondary">Sign in with your Theona account to continue.</p>
           {/* Full page navigation, not a fetch — the server needs to set a cookie and redirect
-              through Theona's own login page before landing back here. */}
+              through Theona's own login page before landing back here — on this same page, so a
+              deep link such as /connect?label=Apify survives the sign-in. */}
           <a
-            href="/api/auth/login"
+            href={`/api/auth/login?return_to=${encodeURIComponent(window.location.href)}`}
             className="mt-6 inline-block rounded-full bg-accent px-5 py-2.5 text-sm font-semibold text-white hover:bg-accent-hover"
           >
             Sign in with Theona

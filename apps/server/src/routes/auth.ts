@@ -24,6 +24,13 @@ interface FlowCookiePayload {
   returnTo?: string;
 }
 
+/** Compares parsed origins: a prefix check would also pass `https://<our host>.evil.test`. */
+function sameOriginUrl(candidate: string | undefined, base: string): string | undefined {
+  if (!candidate || !URL.canParse(candidate)) return undefined;
+  const url = new URL(candidate);
+  return url.origin === new URL(base).origin ? url.toString() : undefined;
+}
+
 interface TheonaTokenResponse {
   access_token: string;
 }
@@ -44,8 +51,7 @@ export function registerAuthRoutes(app: FastifyInstance, core: CoreServices, aut
     const state = generateState();
 
     const query = request.query as { return_to?: string };
-    const returnTo =
-      query.return_to && query.return_to.startsWith(auth.appPublicBaseUrl) ? query.return_to : undefined;
+    const returnTo = sameOriginUrl(query.return_to, auth.appPublicBaseUrl);
 
     const flow: FlowCookiePayload = { verifier, state, returnTo };
     reply.setCookie(FLOW_COOKIE_NAME, JSON.stringify(flow), {
