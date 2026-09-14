@@ -1,3 +1,5 @@
+import { useAuth } from "../auth/AuthProvider.js";
+import { AccessKeysCard } from "../components/AccessKeysCard.js";
 import { CodeBlock } from "../components/CodeBlock.js";
 
 const labelClass = "text-[11px] font-medium uppercase tracking-[0.14em] text-text-muted";
@@ -37,6 +39,8 @@ function ClientCard({
 }
 
 export function ConnectView() {
+  const { status } = useAuth();
+
   return (
     <div className="flex flex-col gap-6">
       <div className="flex max-w-[640px] flex-col gap-2">
@@ -55,6 +59,8 @@ export function ConnectView() {
           <CodeBlock code={MCP_URL} />
         </div>
       </div>
+
+      {status.kind === "authenticated" && <AccessKeysCard />}
 
       <ClientCard
         title="Claude Code"

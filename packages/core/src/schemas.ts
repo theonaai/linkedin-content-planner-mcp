@@ -103,3 +103,7 @@ export const updateMemberRoleInputSchema = z.object({
 export const createWorkspaceInputSchema = z.object({
   name: z.string().trim().min(1).max(MAX_WORKSPACE_NAME_LENGTH),
 });
+
+export const createAccessKeyInputSchema = z.object({
+  label: z.string().trim().min(1).max(100),
+});

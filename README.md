@@ -71,6 +71,18 @@ per-workspace caps apply identically. Set `ATTACHMENT_UPLOAD_SECRET` when runnin
 instance — unset, each process signs with its own random key and a ticket minted by one instance
 will not verify on another.
 
+## Access keys
+
+Some MCP clients cannot run the OAuth flow — an Apify Standby Actor, for one, whose
+`Authorization` header already carries the caller's Apify token. For those, a signed-in user
+creates a long-lived access key on the Connect page (`/connect?label=Apify` prefills the form)
+and the client sends it as `Authorization: Bearer planner_mcp_…`.
+
+A key opens `/mcp` for one workspace as the user who created it, and `/mcp` still re-checks that
+membership on every request. Only the key's sha256 is stored, so it is shown once and can only be
+revoked afterwards. When the key store cannot be reached, `/mcp` answers 503 rather than 401, so a
+client holding a working key is not told to replace it.
+
 ## Discovery
 
 Two unauthenticated documents let a client — or an MCP registry — learn what this server is and

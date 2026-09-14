@@ -107,3 +107,16 @@ export interface Invite {
   invitedByUserId: string | null;
   createdAt: string;
 }
+
+export interface AccessKey {
+  id: string;
+  label: string;
+  workspaceId: string;
+  createdAt: string;
+  lastUsedAt: string | null;
+}
+
+export interface CreatedAccessKey extends AccessKey {
+  /** Returned once, at creation; the server keeps only its hash. */
+  accessKey: string;
+}

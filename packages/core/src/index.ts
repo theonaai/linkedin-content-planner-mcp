@@ -17,3 +17,4 @@ export * from "./services/users.js";
 export * from "./services/authz.js";
 export * from "./services/invites.js";
 
+export * from "./services/accessKeys.js";
