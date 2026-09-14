@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 
-const EFFECTIVE = "2 September 2026";
+const EFFECTIVE = "14 September 2026";
 const CONTACT = "privacy@theona.ai";
 
 function Section({ title, children }: { title: string; children: ReactNode }) {
@@ -77,7 +77,9 @@ export function PrivacyView() {
           </p>
           <p>
             <strong className="font-medium text-text-primary">Agent connections.</strong> OAuth sessions, grants and
-            tokens for the agents you authorise, and the workspace each grant is bound to.
+            tokens for the agents you authorise, and the workspace each grant is bound to. If you create an access
+            key, its label, the workspace it opens, when it was created, last used and revoked, and a one-way hash
+            of the key &mdash; never the key itself.
           </p>
           <p>
             <strong className="font-medium text-text-primary">Technical data.</strong> Requests to the service are
@@ -124,13 +126,19 @@ export function PrivacyView() {
         </Section>
 
         <Section title="Sharing">
-          <p>Three recipients, and no others.</p>
+          <p>These recipients, and no others.</p>
           <p>
             <strong className="font-medium text-text-primary">The AI agents you authorise.</strong> Connecting an agent
             gives it read and write access to the posts, comments and attachments in the workspace you grant it. That
             content is processed by that agent&rsquo;s provider under their terms, not ours &mdash; whether that is
             Theona, Anthropic, OpenAI, or a client you run yourself. Choosing which agent to connect is choosing who
             reads your drafts, and it is a choice we cannot make or audit on your behalf.
+          </p>
+          <p>
+            <strong className="font-medium text-text-primary">Apify, if you connect through it.</strong> The Planner is
+            also listed as an Actor on Apify. When you call it there, your requests and the content they return pass
+            through Apify&rsquo;s platform, together with your access key, and Apify processes them under its own
+            terms and privacy policy. Connecting directly to the endpoint on this domain does not involve Apify.
           </p>
           <p>
             <strong className="font-medium text-text-primary">Railway.</strong> Hosts the service, its database, and
@@ -167,7 +175,8 @@ export function PrivacyView() {
           <p>
             A webhook&rsquo;s delivery records duplicate the content of the posts they announce. They are held until
             you delete the webhook and are erased along with it. Sign-in sessions expire after 14 days, and a token
-            issued to an agent stops working at its expiry.
+            issued to an agent stops working at its expiry. An access key does not expire: it works until you revoke
+            it on the Connect page, and the record of a revoked key stays until the workspace or your account is erased.
           </p>
           <p>
             Request logs are held on our hosting platform on its own rolling schedule and expire there. We do not copy
@@ -178,7 +187,8 @@ export function PrivacyView() {
         <Section title="Security">
           <p>
             Access is scoped to the workspace an agent&rsquo;s grant is bound to, so a token cannot reach a workspace
-            it was not authorised for. Attachments are stored with encryption at rest.
+            it was not authorised for; an access key is bound the same way to the one workspace it was created in.
+            Attachments are stored with encryption at rest.
           </p>
         </Section>
 
